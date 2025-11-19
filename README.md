@@ -16,4 +16,4 @@ Enquanto você não configurar o Supabase, o dashboard mantém todas as transaç
 - `index.html`: ponto de entrada com os imports do React, Babel, Chart.js e Supabase.
 - `src/app.jsx`: código React com os formulários, filtros, gráficos e chamadas ao Supabase.
 - `styles.css`: reaproveita o layout original (tema escuro) com pequenos ajustes para componentes do React.
-- `legacy_static/`: versão anterior em HTML/CSS puro caso precise consultar algo.
+
