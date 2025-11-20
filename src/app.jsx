@@ -848,11 +848,11 @@ function App() {
         query = client.from('profiles').update(payload).eq('id', editingUserId);
       } else {
         query = client.rpc('create_dashboard_user', {
-          user_name: userForm.name,
-          user_username: userForm.username,
-          user_password: userForm.password,
-          user_whatsapp: userForm.whatsapp,
-          user_role: userForm.role
+          p_name: userForm.name,
+          p_username: userForm.username,
+          p_password: userForm.password,
+          p_whatsapp: userForm.whatsapp,
+          p_role: userForm.role,
         });
       }
       const { error } = await query;
