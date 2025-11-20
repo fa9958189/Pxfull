@@ -564,6 +564,8 @@ function App() {
   const { client, configError } = useSupabaseClient();
   const { session, profile, loadingSession } = useAuth(client);
 
+  const isAdmin = profile?.role === 'admin';
+
   const [loginForm, setLoginForm] = useState({ email: '', password: '' });
   const [loginError, setLoginError] = useState('');
   const [loginLoading, setLoginLoading] = useState(false);
@@ -880,8 +882,6 @@ function App() {
       pushToast('Configure permissões de delete na tabela profiles.', 'danger');
     }
   };
-
-  const isAdmin = profile?.role === 'admin';
 
   if (!session) {
     return (
