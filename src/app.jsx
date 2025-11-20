@@ -50,8 +50,8 @@ const getLocalSnapshot = () => {
     if (!raw) return { transactions: [], events: [] };
     const parsed = JSON.parse(raw);
     return {
-      transactions: parsed.transactions || [],
-      events: parsed.events || []
+      transactions: Array.isArray(parsed.transactions) ? parsed.transactions : [],
+      events: Array.isArray(parsed.events) ? parsed.events : []
     };
   } catch (err) {
     console.warn('Erro ao ler cache local', err);
@@ -564,6 +564,8 @@ function App() {
   const { client, configError } = useSupabaseClient();
   const { session, profile, loadingSession } = useAuth(client);
 
+  const isAdmin = profile?.role === 'admin';
+
   const [loginForm, setLoginForm] = useState({ email: '', password: '' });
   const [loginError, setLoginError] = useState('');
   const [loginLoading, setLoginLoading] = useState(false);
@@ -579,6 +581,7 @@ function App() {
   const [txFilters, setTxFilters] = useState(defaultTxFilters);
   const [eventFilters, setEventFilters] = useState(defaultEventFilters);
   const [activeTab, setActiveTab] = useState('form');
+  const [activePage, setActivePage] = useState('transactions');
 
   const [toast, setToast] = useState(null);
   const [loadingData, setLoadingData] = useState(false);
@@ -599,24 +602,40 @@ function App() {
       if (txFilters.search) {
         txQuery.or(`description.ilike.%${txFilters.search}%,category.ilike.%${txFilters.search}%`);
       }
-      const [{ data: txData, error: txError }, { data: eventData, error: evError }, { data: userData, error: userError }] = await Promise.all([
+      const queries = [
         txQuery,
         client
           .from('events')
           .select('*')
           .eq('user_id', session.user.id)
-          .order('date', { ascending: false }),
-        client
-          .from('profiles')
-          .select('*')
-          .order('created_at', { ascending: false })
-      ]);
+          .order('date', { ascending: false })
+      ];
+
+      if (profile?.role === 'admin') {
+        queries.push(
+          client
+            .from('profiles')
+            .select('*')
+            .order('created_at', { ascending: false })
+        );
+      }
+
+      const [
+        { data: txData, error: txError },
+        { data: eventData, error: evError },
+        userResponse
+      ] = await Promise.all(queries);
       if (txError) throw txError;
       if (evError) throw evError;
-      if (userError) throw userError;
       setTransactions(txData || []);
       setEvents(eventData || []);
-      setUsers(userData || []);
+      if (profile?.role === 'admin') {
+        const { data: userData, error: userError } = userResponse || {};
+        if (userError) throw userError;
+        setUsers(userData || []);
+      } else {
+        setUsers([]);
+      }
       persistLocalSnapshot({ transactions: txData || [], events: eventData || [] });
     } catch (err) {
       console.warn('Falha ao sincronizar com Supabase, usando cache local.', err);
@@ -630,10 +649,25 @@ function App() {
     if (!session) return;
     loadRemoteData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session, profile?.role]);
+
+  useEffect(() => {
+    if (!session) return;
+    const snapshot = getLocalSnapshot();
+    const belongsToUser = (item) => item.user_id === session.user.id;
+    setTransactions((snapshot.transactions || []).filter(belongsToUser));
+    setEvents((snapshot.events || []).filter(belongsToUser));
   }, [session]);
+
+  useEffect(() => {
+    if (!isAdmin && activePage === 'users') {
+      setActivePage('transactions');
+    }
+  }, [isAdmin, activePage]);
 
   const filteredTransactions = useMemo(() => {
     return transactions.filter((tx) => {
+      if (session && tx.user_id && tx.user_id !== session.user.id) return false;
       if (txFilters.type && tx.type !== txFilters.type) return false;
       if (txFilters.from && tx.date < txFilters.from) return false;
       if (txFilters.to && tx.date > txFilters.to) return false;
@@ -650,6 +684,7 @@ function App() {
 
   const filteredEvents = useMemo(() => {
     return events.filter((ev) => {
+      if (session && ev.user_id && ev.user_id !== session.user.id) return false;
       if (eventFilters.from && ev.date < eventFilters.from) return false;
       if (eventFilters.to && ev.date > eventFilters.to) return false;
       if (eventFilters.search) {
@@ -703,7 +738,7 @@ function App() {
   };
 
   const handleSaveTransaction = async () => {
-    const payload = { ...txForm, id: txForm.id || randomId(), amount: Number(txForm.amount || 0) };
+    const payload = { ...txForm, id: txForm.id || randomId(), amount: Number(txForm.amount || 0), user_id: session?.user?.id };
     let newList;
     if (txForm.id) {
       newList = transactions.map((tx) => (tx.id === txForm.id ? payload : tx));
@@ -751,7 +786,7 @@ function App() {
   };
 
   const handleSaveEvent = async () => {
-    const payload = { ...eventForm, id: eventForm.id || randomId() };
+    const payload = { ...eventForm, id: eventForm.id || randomId(), user_id: session?.user?.id };
     const newList = eventForm.id
       ? events.map((ev) => (ev.id === eventForm.id ? payload : ev))
       : [payload, ...events];
@@ -848,8 +883,6 @@ function App() {
     }
   };
 
-  const isAdmin = profile?.role === 'admin';
-
   if (!session) {
     return (
       <>
@@ -870,8 +903,26 @@ function App() {
     <>
       <Toast toast={toast} onClose={() => setToast(null)} />
       <DashboardHeader apiUrl={window.APP_CONFIG?.supabaseUrl} profile={profile} onLogout={handleLogout} />
-      <div className="container">
-        <section className="card dashboard-card">
+      <div className="page-nav tabs">
+        <button
+          className={activePage === 'transactions' ? 'tab active' : 'tab'}
+          onClick={() => setActivePage('transactions')}
+        >
+          Transações
+        </button>
+        {isAdmin && (
+          <button
+            className={activePage === 'users' ? 'tab active' : 'tab'}
+            onClick={() => setActivePage('users')}
+          >
+            Cadastro de Usuários
+          </button>
+        )}
+      </div>
+
+      {activePage === 'transactions' && (
+        <div className="container">
+          <section className="card dashboard-card">
           <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
             <h2 className="title">Transações</h2>
             <div className="tabs">
@@ -967,73 +1018,77 @@ function App() {
           {activeTab === 'reports' && <Reports transactions={filteredTransactions} />}
         </section>
 
-        <aside className="card">
-          <h2 className="title">Agenda</h2>
+          <aside className="card">
+            <h2 className="title">Agenda</h2>
 
-          <div className="grid grid-2" style={{ marginBottom: 8 }}>
-            <div>
-              <label>Título</label>
-              <input value={eventForm.title} onChange={(e) => setEventForm({ ...eventForm, title: e.target.value })} placeholder="Reunião, Médico, etc." />
+            <div className="grid grid-2" style={{ marginBottom: 8 }}>
+              <div>
+                <label>Título</label>
+                <input value={eventForm.title} onChange={(e) => setEventForm({ ...eventForm, title: e.target.value })} placeholder="Reunião, Médico, etc." />
+              </div>
+              <div>
+                <label>Data</label>
+                <input type="date" value={eventForm.date} onChange={(e) => setEventForm({ ...eventForm, date: e.target.value })} />
+              </div>
             </div>
-            <div>
-              <label>Data</label>
-              <input type="date" value={eventForm.date} onChange={(e) => setEventForm({ ...eventForm, date: e.target.value })} />
+            <div className="grid grid-2">
+              <div>
+                <label>Início</label>
+                <input type="time" value={eventForm.start} onChange={(e) => setEventForm({ ...eventForm, start: e.target.value })} />
+              </div>
+              <div>
+                <label>Fim</label>
+                <input type="time" value={eventForm.end} onChange={(e) => setEventForm({ ...eventForm, end: e.target.value })} />
+              </div>
             </div>
-          </div>
-          <div className="grid grid-2">
-            <div>
-              <label>Início</label>
-              <input type="time" value={eventForm.start} onChange={(e) => setEventForm({ ...eventForm, start: e.target.value })} />
+            <div style={{ marginTop: 8 }}>
+              <label>Notas</label>
+              <textarea value={eventForm.notes} onChange={(e) => setEventForm({ ...eventForm, notes: e.target.value })} placeholder="Observações do evento..."></textarea>
             </div>
-            <div>
-              <label>Fim</label>
-              <input type="time" value={eventForm.end} onChange={(e) => setEventForm({ ...eventForm, end: e.target.value })} />
+            <div className="row" style={{ justifyContent: 'flex-end', marginTop: 8 }}>
+              <button className="primary" onClick={handleSaveEvent}>{eventForm.id ? 'Atualizar' : 'Adicionar Evento'}</button>
+              <button className="ghost" onClick={() => setEventForm(defaultEventForm)}>Limpar</button>
             </div>
-          </div>
-          <div style={{ marginTop: 8 }}>
-            <label>Notas</label>
-            <textarea value={eventForm.notes} onChange={(e) => setEventForm({ ...eventForm, notes: e.target.value })} placeholder="Observações do evento..."></textarea>
-          </div>
-          <div className="row" style={{ justifyContent: 'flex-end', marginTop: 8 }}>
-            <button className="primary" onClick={handleSaveEvent}>{eventForm.id ? 'Atualizar' : 'Adicionar Evento'}</button>
-            <button className="ghost" onClick={() => setEventForm(defaultEventForm)}>Limpar</button>
-          </div>
 
-          <div className="sep"></div>
+            <div className="sep"></div>
 
-          <div className="row">
-            <div style={{ flex: 1 }}>
-              <label>De</label>
-              <input type="date" value={eventFilters.from} onChange={(e) => setEventFilters({ ...eventFilters, from: e.target.value })} />
+            <div className="row">
+              <div style={{ flex: 1 }}>
+                <label>De</label>
+                <input type="date" value={eventFilters.from} onChange={(e) => setEventFilters({ ...eventFilters, from: e.target.value })} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <label>Até</label>
+                <input type="date" value={eventFilters.to} onChange={(e) => setEventFilters({ ...eventFilters, to: e.target.value })} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <label>Busca</label>
+                <input value={eventFilters.search} onChange={(e) => setEventFilters({ ...eventFilters, search: e.target.value })} placeholder="título/notas" />
+              </div>
+              <div style={{ alignSelf: 'flex-end' }}>
+                <button onClick={loadRemoteData} disabled={loadingData}>
+                  {loadingData ? 'Sincronizando...' : 'Filtrar'}
+                </button>
+              </div>
             </div>
-            <div style={{ flex: 1 }}>
-              <label>Até</label>
-              <input type="date" value={eventFilters.to} onChange={(e) => setEventFilters({ ...eventFilters, to: e.target.value })} />
-            </div>
-            <div style={{ flex: 1 }}>
-              <label>Busca</label>
-              <input value={eventFilters.search} onChange={(e) => setEventFilters({ ...eventFilters, search: e.target.value })} placeholder="título/notas" />
-            </div>
-            <div style={{ alignSelf: 'flex-end' }}>
-              <button onClick={loadRemoteData} disabled={loadingData}>
-                {loadingData ? 'Sincronizando...' : 'Filtrar'}
-              </button>
-            </div>
-          </div>
 
-          <div className="sep"></div>
+            <div className="sep"></div>
 
-          <EventsTable
-            items={filteredEvents}
-            onEdit={(ev) => setEventForm(ev)}
-            onDelete={handleDeleteEvent}
-          />
-        </aside>
+            <EventsTable
+              items={filteredEvents}
+              onEdit={(ev) => setEventForm(ev)}
+              onDelete={handleDeleteEvent}
+            />
+          </aside>
 
-        {isAdmin && (
+        </div>
+      )}
+
+      {activePage === 'users' && isAdmin && (
+        <div className="container single-card">
           <section className="card admin-card" id="adminUsersSection">
-            <h2 className="title">Gerenciar Usuários</h2>
-            <p className="muted">Crie contas para seus amigos. Cada um verá apenas os próprios dados.</p>
+            <h2 className="title">Cadastro de Usuários</h2>
+            <p className="muted">Somente administradores podem acessar esta área.</p>
 
             <div className="grid grid-2 admin-user-form">
               <div>
@@ -1082,8 +1137,8 @@ function App() {
               onDelete={handleDeleteUser}
             />
           </section>
-        )}
-      </div>
+        </div>
+      )}
     </>
   );
 }
