@@ -837,20 +837,28 @@ function App() {
         role: userForm.role,
         id: editingUserId
       };
-      let query;
       if (editingUserId) {
-        query = client.from('profiles').update(payload).eq('id', editingUserId);
+        const { error } = await client.from('profiles').update(payload).eq('id', editingUserId);
+        if (error) throw error;
       } else {
-        query = client.rpc('create_dashboard_user', {
-          p_name: userForm.name,
-          p_username: userForm.username,
-          p_password: userForm.password,
-          p_whatsapp: userForm.whatsapp,
-          p_role: userForm.role,
+        // Criar usuário via backend
+        const response = await fetch('http://localhost:3001/create-user', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: userForm.name,
+            username: userForm.username,
+            password: userForm.password,
+            whatsapp: userForm.whatsapp,
+            role: userForm.role
+          })
         });
+
+        const body = await response.json();
+        if (!response.ok) {
+          throw new Error(body.error || 'Erro ao criar usuário.');
+        }
       }
-      const { error } = await query;
-      if (error) throw error;
       pushToast('Usuário sincronizado com o Supabase.', 'success');
       setUserForm(defaultUserForm);
       setEditingUserId(null);
