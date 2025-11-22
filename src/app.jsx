@@ -113,59 +113,25 @@ const useSupabaseClient = () => {
   return { client, configError };
 };
 
-const useAuth = (client) => {
+const useAuth = () => {
   const [session, setSession] = useState(null);
   const [profile, setProfile] = useState(null);
-  const [loadingSession, setLoadingSession] = useState(false);
 
   useEffect(() => {
-    if (!client) return;
-    let mounted = true;
-    setLoadingSession(true);
-    client.auth.getSession().then(({ data }) => {
-      if (!mounted) return;
-      setSession(data?.session || null);
-      setLoadingSession(false);
+    const raw = window.localStorage.getItem('gp-session');
+    if (!raw) return;
+
+    const parsed = JSON.parse(raw);
+    setSession(parsed);
+
+    setProfile({
+      id: parsed.user.id,
+      name: parsed.user.name,
+      role: parsed.user.role
     });
+  }, []);
 
-    const { data: listener } = client.auth.onAuthStateChange((_event, newSession) => {
-      setSession(newSession);
-    });
-
-    return () => {
-      mounted = false;
-      listener.subscription.unsubscribe();
-    };
-  }, [client]);
-
-  useEffect(() => {
-    if (!client || !session) {
-      setProfile(null);
-      return;
-    }
-    let active = true;
-    const loadProfile = async () => {
-      const { data, error } = await client
-        .from('profiles')
-        .select('*')
-        .eq('id', session.user.id)
-        .single();
-      if (!active) return;
-      if (error) {
-        console.warn('Perfil não encontrado, usando metadados.', error);
-        setProfile({
-          id: session.user.id,
-          name: session.user.user_metadata?.full_name || session.user.email,
-          role: session.user.user_metadata?.role || 'user'
-        });
-        return;
-      }
-      setProfile(data);
-    };
-    loadProfile();
-  }, [client, session]);
-
-  return { session, profile, loadingSession };
+  return { session, profile };
 };
 
 const Toast = ({ toast, onClose }) => {
@@ -713,28 +679,56 @@ function App() {
 
   const handleLogin = async () => {
     if (!client) return;
+
     setLoginLoading(true);
     setLoginError('');
+
     try {
-      const { error } = await client.auth.signInWithPassword({
-        email: loginForm.email,
-        password: loginForm.password
-      });
-      if (error) throw error;
+      const { data: authRow, error } = await client
+        .from('profiles_auth')
+        .select('*')
+        .eq('email', loginForm.email)
+        .single();
+
+      if (error || !authRow) throw new Error('Usuário não encontrado.');
+
+      if (authRow.password !== loginForm.password) {
+        throw new Error('Senha incorreta.');
+      }
+
+      const { data: profileData, error: profileError } = await client
+        .from('profiles')
+        .select('*')
+        .eq('id', authRow.id)
+        .single();
+
+      if (profileError || !profileData) {
+        throw new Error('Perfil não encontrado.');
+      }
+
+      window.localStorage.setItem('gp-session', JSON.stringify({
+        user: {
+          id: profileData.id,
+          name: profileData.name,
+          role: profileData.role,
+          email: loginForm.email
+        }
+      }));
+
       pushToast('Login realizado com sucesso!', 'success');
+      window.location.reload();
+
     } catch (err) {
       console.error('Erro no login', err);
-      setLoginError(err.message || 'Não foi possível entrar.');
+      setLoginError(err.message || 'Erro ao fazer login.');
     } finally {
       setLoginLoading(false);
     }
   };
 
-  const handleLogout = async () => {
-    if (!client) return;
-    await client.auth.signOut();
-    setTransactions(getLocalSnapshot().transactions);
-    setEvents(getLocalSnapshot().events);
+  const handleLogout = () => {
+    window.localStorage.removeItem('gp-session');
+    window.location.reload();
   };
 
   const handleSaveTransaction = async () => {
@@ -843,20 +837,28 @@ function App() {
         role: userForm.role,
         id: editingUserId
       };
-      let query;
       if (editingUserId) {
-        query = client.from('profiles').update(payload).eq('id', editingUserId);
+        const { error } = await client.from('profiles').update(payload).eq('id', editingUserId);
+        if (error) throw error;
       } else {
-        query = client.rpc('create_dashboard_user', {
-          p_name: userForm.name,
-          p_username: userForm.username,
-          p_password: userForm.password,
-          p_whatsapp: userForm.whatsapp,
-          p_role: userForm.role,
+        // Criar usuário via backend
+        const response = await fetch('http://localhost:3001/create-user', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: userForm.name,
+            username: userForm.username,
+            password: userForm.password,
+            whatsapp: userForm.whatsapp,
+            role: userForm.role
+          })
         });
+
+        const body = await response.json();
+        if (!response.ok) {
+          throw new Error(body.error || 'Erro ao criar usuário.');
+        }
       }
-      const { error } = await query;
-      if (error) throw error;
       pushToast('Usuário sincronizado com o Supabase.', 'success');
       setUserForm(defaultUserForm);
       setEditingUserId(null);
