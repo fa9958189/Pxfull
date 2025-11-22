@@ -15,7 +15,7 @@ app.post("/create-user", async (req, res) => {
     const { data: authUser, error: authError } =
       await supabase.auth.admin.createUser({
         email: `${username}@example.com`,
-        password: password,
+        password,
         user_metadata: { full_name: name, role }
       });
 
@@ -48,7 +48,7 @@ app.post("/create-user", async (req, res) => {
       .insert({
         id: userId,
         email: `${username}@example.com`,
-        password: password
+        password
       });
 
     if (authTableError) {
@@ -63,4 +63,6 @@ app.post("/create-user", async (req, res) => {
   }
 });
 
-app.listen(3001, () => console.log("Backend rodando na porta 3001"));
+app.listen(3001, () => {
+  console.log("Backend rodando na porta 3001");
+});
