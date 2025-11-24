@@ -677,91 +677,141 @@ function App() {
     };
   }, [filteredTransactions]);
 
-  const handleLogin = async () => {
-    if (!client) return;
 
-    setLoginLoading(true);
-    setLoginError('');
+            const handleLogin = async () => {
+                if (!client) return;
 
-    try {
-      const { data: authRow, error } = await client
-        .from('profiles_auth')
-        .select('*')
-        .eq('email', loginForm.email)
-        .single();
+                setLoginLoading(true);
+                setLoginError('');
 
-      if (error || !authRow) throw new Error('Usuário não encontrado.');
+                try {
+                  // 1) Login real no Supabase Auth
+                  const { data: signInData, error: signInError } =
+                    await client.auth.signInWithPassword({
+                      email: loginForm.email,
+                      password: loginForm.password,
+                    });
 
-      if (authRow.password !== loginForm.password) {
-        throw new Error('Senha incorreta.');
-      }
+                  if (signInError || !signInData?.user) {
+                    throw new Error(signInError?.message || 'E-mail ou senha inválidos.');
+                  }
 
-      const { data: profileData, error: profileError } = await client
-        .from('profiles')
-        .select('*')
-        .eq('id', authRow.id)
-        .single();
+                  const authUser = signInData.user;
+                  console.log('authUser.id:', authUser.id);
 
-      if (profileError || !profileData) {
-        throw new Error('Perfil não encontrado.');
-      }
+                  // 2) Buscar o registro correspondente em profiles_auth pelo auth_id
+                  const { data: authProfile, error: authProfileError } = await client
+                    .from('profiles_auth')
+                    .select('id, name, role, auth_id, email')
+                    .eq('auth_id', authUser.id)
+                    .single();
 
-      window.localStorage.setItem('gp-session', JSON.stringify({
-        user: {
-          id: profileData.id,
-          name: profileData.name,
-          role: profileData.role,
-          email: loginForm.email
-        }
-      }));
+                  console.log('authProfile:', authProfile);
+                  console.log('authProfileError:', authProfileError);
 
-      pushToast('Login realizado com sucesso!', 'success');
-      window.location.reload();
+                  if (authProfileError || !authProfile) {
+                    throw new Error('Perfil de autenticação não encontrado em profiles_auth.');
+                  }
 
-    } catch (err) {
-      console.error('Erro no login', err);
-      setLoginError(err.message || 'Erro ao fazer login.');
-    } finally {
-      setLoginLoading(false);
-    }
-  };
+                  // 3) Montar o "profileData" usando a própria tabela profiles_auth
+                  const profileData = {
+                    id: authProfile.id,
+                    name: authProfile.name,
+                    role: authProfile.role,
+                  };
+
+                  // 4) Guardar sessão no localStorage
+                  window.localStorage.setItem(
+                    'gp-session',
+                    JSON.stringify({
+                      user: {
+                        id: profileData.id,
+                        name: profileData.name,
+                        role: profileData.role,
+                        email: loginForm.email,
+                      },
+                    }),
+                  );
+
+                  pushToast('Login realizado com sucesso!', 'success');
+                  window.location.reload();
+                } catch (err) {
+                  console.error('Erro no login', err);
+                  setLoginError(err.message || 'Erro ao fazer login.');
+                } finally {
+                  setLoginLoading(false);
+                }
+              };
+
 
   const handleLogout = () => {
     window.localStorage.removeItem('gp-session');
     window.location.reload();
   };
 
-  const handleSaveTransaction = async () => {
-    const payload = { ...txForm, id: txForm.id || randomId(), amount: Number(txForm.amount || 0), user_id: session?.user?.id };
-    let newList;
-    if (txForm.id) {
-      newList = transactions.map((tx) => (tx.id === txForm.id ? payload : tx));
-    } else {
-      newList = [payload, ...transactions];
-    }
-    setTransactions(newList);
-    persistLocalSnapshot({ transactions: newList });
-    setTxForm(defaultTxForm);
-    try {
-      if (client && session) {
-        const { error } = await client.from('transactions').upsert({
-          id: payload.id,
-          type: payload.type,
-          amount: payload.amount,
-          description: payload.description,
-          category: payload.category,
-          date: payload.date,
-          user_id: session.user.id
-        });
-        if (error) throw error;
-      }
-      pushToast('Transação salva!', 'success');
-      loadRemoteData();
-    } catch (err) {
-      console.warn('Falha ao sincronizar transação', err);
-      pushToast('Transação salva localmente. Configure o Supabase para sincronizar.', 'warning');
-    }
-  };
+                    const handleSaveTransaction = async () => {
+                    if (!session?.user?.id) {
+                      pushToast('Sessão inválida. Faça login novamente.', 'error');
+                      return;
+                    }
+
+                    // monta o payload da transação
+                    const payload = {
+                      id: txForm.id || randomId(),             // gera ID local caso seja nova
+                      type: txForm.type,
+                      amount: Number(txForm.amount || 0),
+                      description: txForm.description,
+                      category: txForm.category,
+                      date: txForm.date,
+                      user_id: session.user.id                // ID do usuário autenticado
+                    };
+
+                    // Atualiza a lista em tela
+                    let newList;
+                    if (txForm.id) {
+                      newList = transactions.map((tx) =>
+                        tx.id === txForm.id ? payload : tx
+                      );
+                    } else {
+                      newList = [payload, ...transactions];
+                    }
+
+                    setTransactions(newList);
+                    persistLocalSnapshot({ transactions: newList }); // mantém backup local
+
+                    // limpa o formulário
+                    setTxForm(defaultTxForm);
+
+                    try {
+                      if (client) {
+                        // salva/atualiza no Supabase
+                        const { error } = await client
+                          .from('transactions')
+                          .upsert({
+                            id: payload.id,
+                            type: payload.type,
+                            amount: payload.amount,
+                            description: payload.description,
+                            category: payload.category,
+                            date: payload.date,
+                            user_id: session.user.id
+                          });
+
+                        if (error) throw error;
+                      }
+
+                      pushToast('Transação salva com sucesso!', 'success');
+                      loadRemoteData(); // recarrega do Supabase
+
+                    } catch (err) {
+                      console.warn('Falha ao sincronizar transação', err);
+                      pushToast(
+                        'Transação salva localmente. Configure o Supabase para sincronizar.',
+                        'warning'
+                      );
+                    }
+                  };
+
 
   const handleDeleteTransaction = async (tx) => {
     const newList = transactions.filter((item) => item.id !== tx.id);
