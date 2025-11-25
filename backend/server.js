@@ -42,19 +42,24 @@ app.post("/create-user", async (req, res) => {
       return res.status(400).json({ error: profileError.message });
     }
 
-    // 3) Grava em profiles_auth (tabela usada no login do app)
-    const { error: authTableError } = await supabase
-      .from("profiles_auth")
-      .insert({
-        id: userId,
-        email: `${username}@example.com`,
-        password
-      });
+       // 3) Grava em profiles_auth (tabela usada no login do app)
+          const { error: authTableError } = await supabase
+            .from("profiles_auth")
+            .insert({
+              auth_id: userId,                         // liga com auth.users
+              name,
+              role,
+              email: `${username}@example.com`,
+              username,
+              whatsapp
+       // id vai ser gerado pelo próprio banco (uuid)
+            });
 
-    if (authTableError) {
-      console.error(authTableError);
-      return res.status(400).json({ error: authTableError.message });
-    }
+          if (authTableError) {
+            console.error(authTableError);
+            return res.status(400).json({ error: authTableError.message });
+          }
+
 
     return res.json({ success: true, id: userId });
   } catch (err) {

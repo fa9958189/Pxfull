@@ -1,3 +1,4 @@
+// reminders.js
 import "dotenv/config";
 import { supabase } from "./supabase.js";
 
@@ -5,38 +6,56 @@ const WHATSAPP_API_URL = process.env.WHATSAPP_API_URL;
 const WHATSAPP_API_TOKEN = process.env.WHATSAPP_API_TOKEN;
 
 /**
- * Consulta eventos que começam dentro da janela configurada.
- * @param {{ windowMinutes?: number }} options
- * @returns {Promise<Array>} Lista de eventos próximos.
+ * Busca eventos que são:
+ *  - hoje
+ *  - daqui a 5 dias
+ * e marca cada um com o tipo de lembrete.
  */
-export async function fetchUpcomingEvents({ windowMinutes = 60 } = {}) {
+export async function fetchUpcomingEvents() {
   const now = new Date();
-  const upperBound = new Date(now.getTime() + windowMinutes * 60 * 1000);
+
+  // Hoje (YYYY-MM-DD)
+  const todayStr = now.toISOString().slice(0, 10);
+
+  // Daqui a 5 dias (YYYY-MM-DD)
+  const fiveDays = new Date(now.getTime() + 5 * 24 * 60 * 60 * 1000);
+  const fiveDaysStr = fiveDays.toISOString().slice(0, 10);
 
   const { data, error } = await supabase
     .from("events")
-    .select("id, title, date, start, end, profile_id")
-    .gte("date", now.toISOString())
-    .lte("date", upperBound.toISOString())
+    .select("id, title, date, start, end, notes, user_id")
+    .in("date", [todayStr, fiveDaysStr])
     .order("date", { ascending: true });
 
   if (error) {
     throw new Error(`Erro ao buscar eventos: ${error.message}`);
   }
 
-  return data || [];
+  const events = data || [];
+
+  // Marca qual tipo de lembrete é cada evento
+  return events.map((ev) => {
+    let reminderType = "other";
+    if (ev.date === todayStr) {
+      reminderType = "today";
+    } else if (ev.date === fiveDaysStr) {
+      reminderType = "five_days_before";
+    }
+    return { ...ev, reminderType };
+  });
 }
 
 /**
- * Busca o WhatsApp do usuário na tabela profiles_auth.
- * @param {string} profileId
+ * Busca o WhatsApp do usuário na tabela profiles.
+ * Aqui usamos o userId que vem do campo user_id da tabela events.
+ * @param {string} userId
  * @returns {Promise<string|null>}
  */
-export async function fetchUserWhatsapp(profileId) {
+export async function fetchUserWhatsapp(userId) {
   const { data, error } = await supabase
-    .from("profiles_auth")
+    .from("profiles")
     .select("whatsapp")
-    .eq("id", profileId)
+    .eq("id", userId)
     .maybeSingle();
 
   if (error) {
@@ -53,16 +72,18 @@ export async function fetchUserWhatsapp(profileId) {
  */
 export async function sendWhatsappMessage({ to, message }) {
   if (!WHATSAPP_API_URL || !WHATSAPP_API_TOKEN) {
-    throw new Error("Configure WHATSAPP_API_URL e WHATSAPP_API_TOKEN para enviar mensagens.");
+    throw new Error(
+      "Configure WHATSAPP_API_URL e WHATSAPP_API_TOKEN para enviar mensagens."
+    );
   }
 
   const response = await fetch(WHATSAPP_API_URL, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${WHATSAPP_API_TOKEN}`
+      Authorization: `Bearer ${WHATSAPP_API_TOKEN}`,
     },
-    body: JSON.stringify({ to, message })
+    body: JSON.stringify({ to, message }),
   });
 
   if (!response.ok) {
@@ -84,17 +105,39 @@ const formatTimeRange = (event) => {
   return `, termina ${event.end}`;
 };
 
+/**
+ * Monta a mensagem de lembrete usando:
+ *  - tipo do lembrete (5 dias antes ou no dia)
+ *  - título
+ *  - data
+ *  - horário (start/end)
+ *  - notas
+ */
 const buildReminderMessage = (event) => {
   const date = new Date(event.date).toLocaleDateString("pt-BR");
   const timeRange = formatTimeRange(event);
-  return `Lembrete: ${event.title || "Evento"} em ${date}${timeRange}.`;
+  const notesPart = event.notes ? `\nNotas: ${event.notes}` : "";
+
+  const title = event.title || "Evento";
+
+  let prefix;
+  if (event.reminderType === "five_days_before") {
+    prefix = `Lembrete: faltam 5 dias para o compromisso "${title}".`;
+  } else if (event.reminderType === "today") {
+    prefix = `Lembrete: hoje é o dia do compromisso "${title}".`;
+  } else {
+    // fallback, se um dia quiser usar esse helper pra outra coisa
+    prefix = `Lembrete do compromisso "${title}".`;
+  }
+
+  return `${prefix}\nData: ${date}${timeRange}${notesPart}`;
 };
 
 /**
  * Inicia um agendador simples que verifica eventos e dispara mensagens.
- * @param {{ intervalMinutes?: number, windowMinutes?: number }} options
+ * @param {{ intervalMinutes?: number }} options
  */
-export function startRemindersJob({ intervalMinutes = 15, windowMinutes = 60 } = {}) {
+export function startRemindersJob({ intervalMinutes = 15 } = {}) {
   let isRunning = false;
 
   const tick = async () => {
@@ -102,10 +145,12 @@ export function startRemindersJob({ intervalMinutes = 15, windowMinutes = 60 } =
     isRunning = true;
 
     try {
-      const events = await fetchUpcomingEvents({ windowMinutes });
+      const events = await fetchUpcomingEvents();
 
       for (const event of events) {
-        const whatsapp = await fetchUserWhatsapp(event.profile_id);
+        if (!event.user_id) continue;
+
+        const whatsapp = await fetchUserWhatsapp(event.user_id);
         if (!whatsapp) continue;
 
         const message = buildReminderMessage(event);
@@ -119,12 +164,15 @@ export function startRemindersJob({ intervalMinutes = 15, windowMinutes = 60 } =
     }
   };
 
+  // roda uma vez ao subir
   tick();
+  // e depois de X em X minutos
   const intervalId = setInterval(tick, intervalMinutes * 60 * 1000);
 
   return () => clearInterval(intervalId);
 }
 
+// Se rodar direto: `node reminders.js`
 if (process.argv[1] && process.argv[1].endsWith("reminders.js")) {
   startRemindersJob();
 }
