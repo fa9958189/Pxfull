@@ -116,23 +116,35 @@ const useSupabaseClient = () => {
 const useAuth = () => {
   const [session, setSession] = useState(null);
   const [profile, setProfile] = useState(null);
+  const [loadingSession, setLoadingSession] = useState(true);
 
   useEffect(() => {
-    const raw = window.localStorage.getItem('gp-session');
-    if (!raw) return;
+    try {
+      const raw = window.localStorage.getItem('gp-session');
+      if (!raw) {
+        setLoadingSession(false);
+        return;
+      }
 
-    const parsed = JSON.parse(raw);
-    setSession(parsed);
+      const parsed = JSON.parse(raw);
+      setSession(parsed);
 
-    setProfile({
-      id: parsed.user.id,
-      name: parsed.user.name,
-      role: parsed.user.role
-    });
+      // se existir profile_id, usa ele; senão cai pro id normal
+      setProfile({
+        id: parsed.user.profile_id || parsed.user.id,
+        name: parsed.user.name,
+        role: parsed.user.role,
+      });
+    } catch (err) {
+      console.warn('Erro ao carregar sessão local', err);
+    } finally {
+      setLoadingSession(false);
+    }
   }, []);
 
-  return { session, profile };
+  return { session, profile, loadingSession };
 };
+
 
 const Toast = ({ toast, onClose }) => {
   if (!toast) return null;
@@ -557,59 +569,82 @@ function App() {
     setTimeout(() => setToast(null), 4000);
   };
 
-  const loadRemoteData = async () => {
-    if (!client || !session) return;
-    setLoadingData(true);
-    try {
-      const txQuery = client.from('transactions').select('*').eq('user_id', session.user.id).order('date', { ascending: false });
-      if (txFilters.from) txQuery.gte('date', txFilters.from);
-      if (txFilters.to) txQuery.lte('date', txFilters.to);
-      if (txFilters.type) txQuery.eq('type', txFilters.type);
-      if (txFilters.search) {
-        txQuery.or(`description.ilike.%${txFilters.search}%,category.ilike.%${txFilters.search}%`);
-      }
-      const queries = [
-        txQuery,
-        client
-          .from('events')
-          .select('*')
-          .eq('user_id', session.user.id)
-          .order('date', { ascending: false })
-      ];
+       // Buscar tudo no Supabase (transações, agenda e lista de usuários se for admin)
+                const loadRemoteData = async () => {
+                  if (!client || !session?.user?.id) return;
 
-      if (profile?.role === 'admin') {
-        queries.push(
-          client
-            .from('profiles')
-            .select('*')
-            .order('created_at', { ascending: false })
-        );
-      }
+                  setLoadingData(true);
 
-      const [
-        { data: txData, error: txError },
-        { data: eventData, error: evError },
-        userResponse
-      ] = await Promise.all(queries);
-      if (txError) throw txError;
-      if (evError) throw evError;
-      setTransactions(txData || []);
-      setEvents(eventData || []);
-      if (profile?.role === 'admin') {
-        const { data: userData, error: userError } = userResponse || {};
-        if (userError) throw userError;
-        setUsers(userData || []);
-      } else {
-        setUsers([]);
-      }
-      persistLocalSnapshot({ transactions: txData || [], events: eventData || [] });
-    } catch (err) {
-      console.warn('Falha ao sincronizar com Supabase, usando cache local.', err);
-      pushToast('Não foi possível sincronizar com o Supabase. Usando dados locais.', 'warning');
-    } finally {
-      setLoadingData(false);
-    }
-  };
+                  try {
+                    // 1) Transações do usuário logado
+                    let txQuery = client
+                      .from('transactions')
+                      .select('*')
+                      .eq('user_id', session.user.id)
+                      .order('date', { ascending: false });
+
+                    // Filtros (se quiser manter)
+                    if (txFilters.from) {
+                      txQuery = txQuery.gte('date', txFilters.from);
+                    }
+                    if (txFilters.to) {
+                      txQuery = txQuery.lte('date', txFilters.to);
+                    }
+                    if (txFilters.type) {
+                      txQuery = txQuery.eq('type', txFilters.type);
+                    }
+                    if (txFilters.search) {
+                      const s = txFilters.search;
+                      txQuery = txQuery.or(
+                        `description.ilike.%${s}%,category.ilike.%${s}%`
+                      );
+                    }
+
+                    const { data: txData, error: txError } = await txQuery;
+                    if (txError) throw txError;
+
+                    // 2) Eventos (agenda) do usuário logado
+                    const { data: eventData, error: evError } = await client
+                      .from('events')
+                      .select('*')
+                      .eq('user_id', session.user.id)
+                      .order('date', { ascending: false });
+
+                    if (evError) throw evError;
+
+                    // 3) Lista de usuários (só se for admin)
+                    let userData = [];
+                    if (profile?.role === 'admin') {
+                      const { data, error } = await client
+                        .from('profiles_auth')
+                        .select('*')
+                        .order('name', { ascending: true });
+
+                      if (error) throw error;
+                      userData = data || [];
+                    }
+
+                    // Atualiza estados
+                    setTransactions(txData || []);
+                    setEvents(eventData || []);
+                    setUsers(userData);
+
+                    // Salva snapshot local
+                    persistLocalSnapshot({
+                      transactions: txData || [],
+                      events: eventData || [],
+                    });
+
+                    console.log('Dados carregados do Supabase com sucesso.');
+                  } catch (err) {
+                    console.warn('Falha ao sincronizar com Supabase, usando cache local.', err);
+                    pushToast('Não foi possível sincronizar com o Supabase. Usando dados locais.', 'warning');
+                  } finally {
+                    setLoadingData(false);
+                  }
+                };
+
+
 
   useEffect(() => {
     if (!session) return;
@@ -678,70 +713,67 @@ function App() {
   }, [filteredTransactions]);
 
 
-            const handleLogin = async () => {
-                if (!client) return;
+                const handleLogin = async () => {
+                  if (!client) return;
 
-                setLoginLoading(true);
-                setLoginError('');
+                  setLoginLoading(true);
+                  setLoginError('');
 
-                try {
-                  // 1) Login real no Supabase Auth
-                  const { data: signInData, error: signInError } =
-                    await client.auth.signInWithPassword({
-                      email: loginForm.email,
-                      password: loginForm.password,
-                    });
-
-                  if (signInError || !signInData?.user) {
-                    throw new Error(signInError?.message || 'E-mail ou senha inválidos.');
-                  }
-
-                  const authUser = signInData.user;
-                  console.log('authUser.id:', authUser.id);
-
-                  // 2) Buscar o registro correspondente em profiles_auth pelo auth_id
-                  const { data: authProfile, error: authProfileError } = await client
-                    .from('profiles_auth')
-                    .select('id, name, role, auth_id, email')
-                    .eq('auth_id', authUser.id)
-                    .single();
-
-                  console.log('authProfile:', authProfile);
-                  console.log('authProfileError:', authProfileError);
-
-                  if (authProfileError || !authProfile) {
-                    throw new Error('Perfil de autenticação não encontrado em profiles_auth.');
-                  }
-
-                  // 3) Montar o "profileData" usando a própria tabela profiles_auth
-                  const profileData = {
-                    id: authProfile.id,
-                    name: authProfile.name,
-                    role: authProfile.role,
-                  };
-
-                  // 4) Guardar sessão no localStorage
-                  window.localStorage.setItem(
-                    'gp-session',
-                    JSON.stringify({
-                      user: {
-                        id: profileData.id,
-                        name: profileData.name,
-                        role: profileData.role,
+                  try {
+                    // 1) Login real no Supabase Auth
+                    const { data: signInData, error: signInError } =
+                      await client.auth.signInWithPassword({
                         email: loginForm.email,
-                      },
-                    }),
-                  );
+                        password: loginForm.password,
+                      });
 
-                  pushToast('Login realizado com sucesso!', 'success');
-                  window.location.reload();
-                } catch (err) {
-                  console.error('Erro no login', err);
-                  setLoginError(err.message || 'Erro ao fazer login.');
-                } finally {
-                  setLoginLoading(false);
-                }
-              };
+                    if (signInError || !signInData?.user) {
+                      throw new Error(signInError?.message || 'E-mail ou senha inválidos.');
+                    }
+
+                    const authUser = signInData.user; // <-- ESTE é o id que o Supabase usa nas FKs
+                    console.log('authUser.id:', authUser.id);
+
+                    // 2) Buscar o registro correspondente em profiles_auth pelo auth_id
+                    const { data: authProfile, error: authProfileError } = await client
+                      .from('profiles_auth')
+                      .select('id, name, role, auth_id, email')
+                      .eq('auth_id', authUser.id)
+                      .single();
+
+                    console.log('authProfile:', authProfile);
+                    console.log('authProfileError:', authProfileError);
+
+                    if (authProfileError || !authProfile) {
+                      throw new Error('Perfil de autenticação não encontrado em profiles_auth.');
+                    }
+
+                    // 3) Guardar sessão no localStorage
+                    //    user.id = authUser.id  (id da tabela auth.users)
+                    //    user.profile_id = authProfile.id  (id da tabela profiles_auth)
+                    window.localStorage.setItem(
+                      'gp-session',
+                      JSON.stringify({
+                        user: {
+                          id: authUser.id,          // <-- esse vai pra transactions.user_id
+                          profile_id: authProfile.id,
+                          name: authProfile.name,
+                          role: authProfile.role,
+                          email: loginForm.email,
+                        },
+                      }),
+                    );
+
+                    pushToast('Login realizado com sucesso!', 'success');
+                    window.location.reload();
+                  } catch (err) {
+                    console.error('Erro no login', err);
+                    setLoginError(err.message || 'Erro ao fazer login.');
+                  } finally {
+                    setLoginLoading(false);
+                  }
+                };
+
 
 
   const handleLogout = () => {
@@ -749,68 +781,65 @@ function App() {
     window.location.reload();
   };
 
-                    const handleSaveTransaction = async () => {
-                    if (!session?.user?.id) {
-                      pushToast('Sessão inválida. Faça login novamente.', 'error');
-                      return;
-                    }
+                  // Salvar transação (local + Supabase)
+                        const handleSaveTransaction = async () => {
+                          // Monta o objeto da transação
+                          const payload = {
+                            ...txForm,
+                            id: txForm.id || randomId(),
+                            amount: Number(txForm.amount || 0),
+                            user_id: session?.user?.id ?? null,
+                          };
 
-                    // monta o payload da transação
-                    const payload = {
-                      id: txForm.id || randomId(),             // gera ID local caso seja nova
-                      type: txForm.type,
-                      amount: Number(txForm.amount || 0),
-                      description: txForm.description,
-                      category: txForm.category,
-                      date: txForm.date,
-                      user_id: session.user.id                // ID do usuário autenticado
-                    };
+                          // Atualiza estado/localStorage primeiro (funciona mesmo sem Supabase)
+                          let newList;
+                          if (txForm.id) {
+                            newList = transactions.map((tx) => (tx.id === txForm.id ? payload : tx));
+                          } else {
+                            newList = [payload, ...transactions];
+                          }
 
-                    // Atualiza a lista em tela
-                    let newList;
-                    if (txForm.id) {
-                      newList = transactions.map((tx) =>
-                        tx.id === txForm.id ? payload : tx
-                      );
-                    } else {
-                      newList = [payload, ...transactions];
-                    }
+                          setTransactions(newList);
+                          persistLocalSnapshot({ transactions: newList });
+                          setTxForm(defaultTxForm);
 
-                    setTransactions(newList);
-                    persistLocalSnapshot({ transactions: newList }); // mantém backup local
+                          // Se não tiver client ou sessão, para por aqui (modo offline)
+                          if (!client || !session?.user?.id) {
+                            console.warn('Sem client ou sessão – salvando só localmente.');
+                            pushToast('Transação salva localmente. Configure o Supabase para sincronizar.', 'warning');
+                            return;
+                          }
 
-                    // limpa o formulário
-                    setTxForm(defaultTxForm);
+                          try {
+                            // Envia para a tabela transactions no Supabase
+                            const { data, error } = await client
+                              .from('transactions')
+                              .upsert({
+                                id: payload.id,
+                                user_id: session.user.id,      // <- mesmo id gravado em profiles_auth.id
+                                type: payload.type,
+                                amount: payload.amount,
+                                description: payload.description,
+                                category: payload.category,
+                                date: payload.date,            // input type="date" já está em YYYY-MM-DD
+                              });
 
-                    try {
-                      if (client) {
-                        // salva/atualiza no Supabase
-                        const { error } = await client
-                          .from('transactions')
-                          .upsert({
-                            id: payload.id,
-                            type: payload.type,
-                            amount: payload.amount,
-                            description: payload.description,
-                            category: payload.category,
-                            date: payload.date,
-                            user_id: session.user.id
-                          });
+                            if (error) {
+                              console.warn('Erro do Supabase ao salvar transação:', error);
+                              throw error;
+                            }
 
-                        if (error) throw error;
-                      }
+                            console.log('Transação sincronizada com Supabase:', data);
+                            pushToast('Transação salva com sucesso!', 'success');
 
-                      pushToast('Transação salva com sucesso!', 'success');
-                      loadRemoteData(); // recarrega do Supabase
+                            // Recarrega dados remotos para garantir que estado = banco
+                            await loadRemoteData();
+                          } catch (err) {
+                            console.warn('Falha ao sincronizar transação com Supabase, usando apenas local.', err);
+                            pushToast('Transação salva localmente. Configure o Supabase para sincronizar.', 'warning');
+                          }
+                        };
 
-                    } catch (err) {
-                      console.warn('Falha ao sincronizar transação', err);
-                      pushToast(
-                        'Transação salva localmente. Configure o Supabase para sincronizar.',
-                        'warning'
-                      );
-                    }
-                  };
 
 
   const handleDeleteTransaction = async (tx) => {
@@ -888,7 +917,7 @@ function App() {
         id: editingUserId
       };
       if (editingUserId) {
-        const { error } = await client.from('profiles').update(payload).eq('id', editingUserId);
+        const { error } = await client.from('profiles_auth').update(payload).eq('id', editingUserId);
         if (error) throw error;
       } else {
         // Criar usuário via backend
@@ -925,7 +954,7 @@ function App() {
       return;
     }
     try {
-      const { error } = await client.from('profiles').delete().eq('id', user.id);
+      const { error } = await client.from('profiles_auth').delete().eq('id', user.id);
       if (error) throw error;
       pushToast('Usuário removido.', 'success');
       loadRemoteData();
