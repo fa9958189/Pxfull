@@ -2,6 +2,9 @@
   "name": "pxfull-backend",
   "type": "module",
   "main": "server.js",
+  "scripts": {
+    "reminders": "node reminders.js"
+  },
   "dependencies": {
     "express": "^4.19.2",
     "cors": "^2.8.5",
