@@ -11,16 +11,44 @@ app.post("/create-user", async (req, res) => {
   try {
     const { name, username, password, whatsapp, role } = req.body;
 
+    if (!name || !username || !password) {
+      return res
+        .status(400)
+        .json({ error: "Nome, usuário e senha são obrigatórios." });
+    }
+
+    const rawUsername = username.trim();
+
+    // Se o "username" já for um e-mail válido, usa ele direto.
+    // Senão, gera um e-mail fake tipo fulano@example.com
+    let email;
+    if (rawUsername.includes("@") && rawUsername.includes(".")) {
+      email = rawUsername.toLowerCase();
+    } else {
+      const cleanUsername = rawUsername
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-z0-9]/g, "");
+
+      if (!cleanUsername) {
+        return res.status(400).json({ error: "Usuário inválido." });
+      }
+
+      email = `${cleanUsername}@example.com`;
+    }
+
     // 1) Cria usuário no Auth (Supabase)
     const { data: authUser, error: authError } =
       await supabase.auth.admin.createUser({
-        email: `${username}@example.com`,
+        email,
         password,
+        email_confirm: true,
         user_metadata: { full_name: name, role }
       });
 
     if (authError) {
-      console.error(authError);
+      console.error("Erro ao criar usuário no Auth:", authError);
       return res.status(400).json({ error: authError.message });
     }
 
@@ -32,38 +60,36 @@ app.post("/create-user", async (req, res) => {
       .insert({
         id: userId,
         name,
-        username,
+        username: rawUsername,
         whatsapp,
         role
       });
 
     if (profileError) {
-      console.error(profileError);
+      console.error("Erro ao gravar em profiles:", profileError);
       return res.status(400).json({ error: profileError.message });
     }
 
-       // 3) Grava em profiles_auth (tabela usada no login do app)
-          const { error: authTableError } = await supabase
-            .from("profiles_auth")
-            .insert({
-              auth_id: userId,                         // liga com auth.users
-              name,
-              role,
-              email: `${username}@example.com`,
-              username,
-              whatsapp
-       // id vai ser gerado pelo próprio banco (uuid)
-            });
+    // 3) Grava em profiles_auth
+    const { error: authTableError } = await supabase
+      .from("profiles_auth")
+      .insert({
+        auth_id: userId,
+        name,
+        role,
+        email,
+        username: rawUsername,
+        whatsapp
+      });
 
-          if (authTableError) {
-            console.error(authTableError);
-            return res.status(400).json({ error: authTableError.message });
-          }
-
+    if (authTableError) {
+      console.error("Erro ao gravar em profiles_auth:", authTableError);
+      return res.status(400).json({ error: authTableError.message });
+    }
 
     return res.json({ success: true, id: userId });
   } catch (err) {
-    console.error(err);
+    console.error("Erro inesperado em /create-user:", err);
     return res.status(500).json({ error: "Erro interno no servidor" });
   }
 });
