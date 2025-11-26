@@ -560,6 +560,8 @@ function App() {
   const [eventFilters, setEventFilters] = useState(defaultEventFilters);
   const [activeTab, setActiveTab] = useState('form');
   const [activePage, setActivePage] = useState('transactions');
+  const [showWorkoutRoutine, setShowWorkoutRoutine] = useState(false);
+  const workoutApiBase = window.APP_CONFIG?.apiBaseUrl || 'http://localhost:3001';
 
   const [toast, setToast] = useState(null);
   const [loadingData, setLoadingData] = useState(false);
@@ -1013,6 +1015,12 @@ function App() {
               <button className={activeTab === 'reports' ? 'tab active' : 'tab'} onClick={() => setActiveTab('reports')}>
                 Relatórios
               </button>
+              <button
+                className={showWorkoutRoutine ? 'tab active' : 'tab'}
+                onClick={() => setShowWorkoutRoutine((prev) => !prev)}
+              >
+                Rotina de Treino
+              </button>
             </div>
           </div>
 
@@ -1098,6 +1106,14 @@ function App() {
 
           {activeTab === 'reports' && <Reports transactions={filteredTransactions} />}
         </section>
+
+        {showWorkoutRoutine && (
+          <WorkoutRoutine
+            apiBaseUrl={workoutApiBase}
+            profileId={profile?.id || session?.user?.id}
+            pushToast={pushToast}
+          />
+        )}
 
           <aside className="card">
             <h2 className="title">Agenda</h2>
