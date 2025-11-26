@@ -133,6 +133,84 @@ const buildReminderMessage = (event) => {
   return `${prefix}\nData: ${date}${timeRange}${notesPart}`;
 };
 
+const getCurrentWeekdayIndex = () => {
+  const jsDay = new Date().getDay();
+  return jsDay === 0 ? 7 : jsDay; // 1=segunda, 7=domingo
+};
+
+async function fetchTodayWorkoutEntries() {
+  const weekday = getCurrentWeekdayIndex();
+
+  const { data, error } = await supabase
+    .from("workout_schedule")
+    .select("id, user_id, weekday, workout_id, time, is_active")
+    .eq("weekday", weekday)
+    .eq("is_active", true);
+
+  if (error) {
+    throw new Error(`Erro ao buscar agenda de treino: ${error.message}`);
+  }
+
+  return data || [];
+}
+
+async function buildWorkoutRemindersForToday() {
+  const entries = await fetchTodayWorkoutEntries();
+  if (!entries.length) return [];
+
+  const workoutIds = Array.from(
+    new Set(entries.map((item) => item.workout_id).filter(Boolean))
+  );
+
+  let workoutsMap = new Map();
+  if (workoutIds.length) {
+    const { data: workouts, error: workoutError } = await supabase
+      .from("workout_routines")
+      .select("id, name, muscle_groups")
+      .in("id", workoutIds);
+
+    if (workoutError) {
+      throw new Error(`Erro ao buscar treinos: ${workoutError.message}`);
+    }
+
+    workoutsMap = new Map((workouts || []).map((item) => [item.id, item]));
+  }
+
+  const userIds = Array.from(new Set(entries.map((item) => item.user_id).filter(Boolean)));
+  const { data: profiles, error: profileError } = await supabase
+    .from("profiles")
+    .select("id, name, whatsapp")
+    .in("id", userIds);
+
+  if (profileError) {
+    throw new Error(`Erro ao buscar perfis: ${profileError.message}`);
+  }
+
+  const profilesMap = new Map((profiles || []).map((item) => [item.id, item]));
+
+  return entries
+    .map((entry) => {
+      const workout = workoutsMap.get(entry.workout_id);
+      const profile = profilesMap.get(entry.user_id);
+
+      if (!workout || !profile || !profile.whatsapp) return null;
+
+      const timePart = entry.time ? ` às ${entry.time}` : "";
+      const muscleGroups = (workout.muscle_groups || "")
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean)
+        .join(", ") || "-";
+
+      const message =
+        `Bom dia, ${profile.name || ""}! Hoje é dia de ${workout.name}${timePart}. ` +
+        `Grupos musculares: ${muscleGroups}. Bora treinar! 💪`;
+
+      return { to: profile.whatsapp, message };
+    })
+    .filter(Boolean);
+}
+
 /**
  * Inicia um agendador simples que verifica eventos e dispara mensagens.
  * @param {{ intervalMinutes?: number }} options
@@ -156,6 +234,15 @@ export function startRemindersJob({ intervalMinutes = 15 } = {}) {
         const message = buildReminderMessage(event);
 
         await sendWhatsappMessage({ to: whatsapp, message });
+      }
+
+      try {
+        const workoutReminders = await buildWorkoutRemindersForToday();
+        for (const reminder of workoutReminders) {
+          await sendWhatsappMessage(reminder);
+        }
+      } catch (workoutErr) {
+        console.error("Erro ao enviar lembretes de treino:", workoutErr.message);
       }
     } catch (err) {
       console.error("Erro no job de lembretes:", err.message);
