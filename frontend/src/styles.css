@@ -460,7 +460,7 @@ canvas{ background:transparent; }
   }
 }
 
+/* esconde a agenda dentro da rotina de treino */
 .workout-schedule {
   display: none;
 }
-
