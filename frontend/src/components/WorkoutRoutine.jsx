@@ -1,15 +1,22 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import muscleTestImg from '../assets/muscles/fototeste.png';
+import chestImg from '../assets/muscles/Peito.png';
+import backImg from '../assets/muscles/Costas.png';
+import shouldersImg from '../assets/muscles/Ombros.png';
+import bicepsImg from '../assets/muscles/Biceps.png';
+import tricepsImg from '../assets/muscles/Triceps.png';
+import absImg from '../assets/muscles/Abdomen.png';
+import legsImg from '../assets/muscles/Pernas.png';
+import glutesImg from '../assets/muscles/Gluteos.png';
 
 const MUSCLE_GROUPS = [
-  { value: 'chest', label: 'Peito', image: muscleTestImg },
-  { value: 'back', label: 'Costas', image: muscleTestImg },
-  { value: 'shoulders', label: 'Ombros', image: muscleTestImg },
-  { value: 'biceps', label: 'Bíceps', image: muscleTestImg },
-  { value: 'triceps', label: 'Tríceps', image: muscleTestImg },
-  { value: 'abs', label: 'Abdômen', image: muscleTestImg },
-  { value: 'legs', label: 'Pernas', image: muscleTestImg },
-  { value: 'glutes', label: 'Glúteos', image: muscleTestImg }
+  { value: 'chest', label: 'Peito', image: chestImg },
+  { value: 'back', label: 'Costas', image: backImg },
+  { value: 'shoulders', label: 'Ombros', image: shouldersImg },
+  { value: 'biceps', label: 'Bíceps', image: bicepsImg },
+  { value: 'triceps', label: 'Tríceps', image: tricepsImg },
+  { value: 'abs', label: 'Abdômen', image: absImg },
+  { value: 'legs', label: 'Pernas', image: legsImg },
+  { value: 'glutes', label: 'Glúteos', image: glutesImg },
 ];
 
 const WEEK_DAYS = [
@@ -139,7 +146,9 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', profileId, pushT
       setLoading(true);
       await fetchJson(`${apiBaseUrl}/workout-routines/${id}`, { method: 'DELETE' });
       setWorkouts((prev) => prev.filter((item) => item.id !== id));
-      setSchedule((prev) => prev.map((slot) => (slot.workout_id === id ? { ...slot, workout_id: '' } : slot)));
+      setSchedule((prev) =>
+        prev.map((slot) => (slot.workout_id === id ? { ...slot, workout_id: '' } : slot))
+      );
       notify('Treino removido.', 'success');
     } catch (err) {
       console.warn('Erro ao excluir treino', err);
@@ -244,7 +253,11 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', profileId, pushT
                     {(item.muscleGroups || []).join(', ')}
                   </div>
                   <div>
-                    <button className="ghost small" onClick={() => handleDeleteWorkout(item.id)} disabled={loading}>
+                    <button
+                      className="ghost small"
+                      onClick={() => handleDeleteWorkout(item.id)}
+                      disabled={loading}
+                    >
                       Excluir
                     </button>
                   </div>
@@ -303,7 +316,11 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', profileId, pushT
           ))}
         </div>
         <div className="row" style={{ justifyContent: 'flex-end', marginTop: 12 }}>
-          <button className="primary" onClick={handleSaveSchedule} disabled={savingSchedule || !hasWorkouts}>
+          <button
+            className="primary"
+            onClick={handleSaveSchedule}
+            disabled={savingSchedule || !hasWorkouts}
+          >
             {savingSchedule ? 'Salvando...' : 'Salvar semana de treino'}
           </button>
         </div>
