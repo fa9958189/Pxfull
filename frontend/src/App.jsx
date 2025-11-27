@@ -561,8 +561,7 @@ function App() {
   const [txFilters, setTxFilters] = useState(defaultTxFilters);
   const [eventFilters, setEventFilters] = useState(defaultEventFilters);
   const [activeTab, setActiveTab] = useState('form');
-  const [activePage, setActivePage] = useState('transactions');
-  const [showWorkoutRoutine, setShowWorkoutRoutine] = useState(false);
+  const [activeView, setActiveView] = useState('transactions');
   const workoutApiBase = window.APP_CONFIG?.apiBaseUrl || 'http://localhost:3001';
 
   const [toast, setToast] = useState(null);
@@ -665,10 +664,10 @@ function App() {
   }, [session]);
 
   useEffect(() => {
-    if (!isAdmin && activePage === 'users') {
-      setActivePage('transactions');
+    if (!isAdmin && activeView === 'users') {
+      setActiveView('transactions');
     }
-  }, [isAdmin, activePage]);
+  }, [isAdmin, activeView]);
 
   const filteredTransactions = useMemo(() => {
     return transactions.filter((tx) => {
@@ -968,6 +967,71 @@ function App() {
     }
   };
 
+  const renderAgenda = () => (
+    <aside className="card">
+      <h2 className="title">Agenda</h2>
+
+      <div className="grid grid-2" style={{ marginBottom: 8 }}>
+        <div>
+          <label>Título</label>
+          <input value={eventForm.title} onChange={(e) => setEventForm({ ...eventForm, title: e.target.value })} placeholder="Reunião, Médico, etc." />
+        </div>
+        <div>
+          <label>Data</label>
+          <input type="date" value={eventForm.date} onChange={(e) => setEventForm({ ...eventForm, date: e.target.value })} />
+        </div>
+      </div>
+      <div className="grid grid-2">
+        <div>
+          <label>Início</label>
+          <input type="time" value={eventForm.start} onChange={(e) => setEventForm({ ...eventForm, start: e.target.value })} />
+        </div>
+        <div>
+          <label>Fim</label>
+          <input type="time" value={eventForm.end} onChange={(e) => setEventForm({ ...eventForm, end: e.target.value })} />
+        </div>
+      </div>
+      <div style={{ marginTop: 8 }}>
+        <label>Notas</label>
+        <textarea value={eventForm.notes} onChange={(e) => setEventForm({ ...eventForm, notes: e.target.value })} placeholder="Observações do evento..."></textarea>
+      </div>
+      <div className="row" style={{ justifyContent: 'flex-end', marginTop: 8 }}>
+        <button className="primary" onClick={handleSaveEvent}>{eventForm.id ? 'Atualizar' : 'Adicionar Evento'}</button>
+        <button className="ghost" onClick={() => setEventForm(defaultEventForm)}>Limpar</button>
+      </div>
+
+      <div className="sep"></div>
+
+      <div className="row">
+        <div style={{ flex: 1 }}>
+          <label>De</label>
+          <input type="date" value={eventFilters.from} onChange={(e) => setEventFilters({ ...eventFilters, from: e.target.value })} />
+        </div>
+        <div style={{ flex: 1 }}>
+          <label>Até</label>
+          <input type="date" value={eventFilters.to} onChange={(e) => setEventFilters({ ...eventFilters, to: e.target.value })} />
+        </div>
+        <div style={{ flex: 1 }}>
+          <label>Busca</label>
+          <input value={eventFilters.search} onChange={(e) => setEventFilters({ ...eventFilters, search: e.target.value })} placeholder="título/notas" />
+        </div>
+        <div style={{ alignSelf: 'flex-end' }}>
+          <button onClick={loadRemoteData} disabled={loadingData}>
+            {loadingData ? 'Sincronizando...' : 'Filtrar'}
+          </button>
+        </div>
+      </div>
+
+      <div className="sep"></div>
+
+      <EventsTable
+        items={filteredEvents}
+        onEdit={(ev) => setEventForm(ev)}
+        onDelete={handleDeleteEvent}
+      />
+    </aside>
+  );
+
   if (!session) {
     return (
       <>
@@ -990,22 +1054,28 @@ function App() {
       <DashboardHeader apiUrl={window.APP_CONFIG?.supabaseUrl} profile={profile} onLogout={handleLogout} />
       <div className="page-nav tabs">
         <button
-          className={activePage === 'transactions' ? 'tab active' : 'tab'}
-          onClick={() => setActivePage('transactions')}
+          className={activeView === 'transactions' ? 'tab active' : 'tab'}
+          onClick={() => setActiveView('transactions')}
         >
           Transações
         </button>
         {isAdmin && (
           <button
-            className={activePage === 'users' ? 'tab active' : 'tab'}
-            onClick={() => setActivePage('users')}
+            className={activeView === 'users' ? 'tab active' : 'tab'}
+            onClick={() => setActiveView('users')}
           >
             Cadastro de Usuários
           </button>
         )}
+        <button
+          className={activeView === 'workout' ? 'tab active' : 'tab'}
+          onClick={() => setActiveView('workout')}
+        >
+          Rotina de Treino
+        </button>
       </div>
 
-      {activePage === 'transactions' && (
+      {activeView === 'transactions' && (
         <div className="container">
           <section className="card dashboard-card">
           <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
@@ -1016,12 +1086,6 @@ function App() {
               </button>
               <button className={activeTab === 'reports' ? 'tab active' : 'tab'} onClick={() => setActiveTab('reports')}>
                 Relatórios
-              </button>
-              <button
-                className={showWorkoutRoutine ? 'tab active' : 'tab'}
-                onClick={() => setShowWorkoutRoutine((prev) => !prev)}
-              >
-                Rotina de Treino
               </button>
             </div>
           </div>
@@ -1108,82 +1172,12 @@ function App() {
 
           {activeTab === 'reports' && <Reports transactions={filteredTransactions} />}
         </section>
-
-        {showWorkoutRoutine && (
-          <WorkoutRoutine
-            apiBaseUrl={workoutApiBase}
-            profileId={profile?.id || session?.user?.id}
-            pushToast={pushToast}
-          />
-        )}
-
-          <aside className="card">
-            <h2 className="title">Agenda</h2>
-
-            <div className="grid grid-2" style={{ marginBottom: 8 }}>
-              <div>
-                <label>Título</label>
-                <input value={eventForm.title} onChange={(e) => setEventForm({ ...eventForm, title: e.target.value })} placeholder="Reunião, Médico, etc." />
-              </div>
-              <div>
-                <label>Data</label>
-                <input type="date" value={eventForm.date} onChange={(e) => setEventForm({ ...eventForm, date: e.target.value })} />
-              </div>
-            </div>
-            <div className="grid grid-2">
-              <div>
-                <label>Início</label>
-                <input type="time" value={eventForm.start} onChange={(e) => setEventForm({ ...eventForm, start: e.target.value })} />
-              </div>
-              <div>
-                <label>Fim</label>
-                <input type="time" value={eventForm.end} onChange={(e) => setEventForm({ ...eventForm, end: e.target.value })} />
-              </div>
-            </div>
-            <div style={{ marginTop: 8 }}>
-              <label>Notas</label>
-              <textarea value={eventForm.notes} onChange={(e) => setEventForm({ ...eventForm, notes: e.target.value })} placeholder="Observações do evento..."></textarea>
-            </div>
-            <div className="row" style={{ justifyContent: 'flex-end', marginTop: 8 }}>
-              <button className="primary" onClick={handleSaveEvent}>{eventForm.id ? 'Atualizar' : 'Adicionar Evento'}</button>
-              <button className="ghost" onClick={() => setEventForm(defaultEventForm)}>Limpar</button>
-            </div>
-
-            <div className="sep"></div>
-
-            <div className="row">
-              <div style={{ flex: 1 }}>
-                <label>De</label>
-                <input type="date" value={eventFilters.from} onChange={(e) => setEventFilters({ ...eventFilters, from: e.target.value })} />
-              </div>
-              <div style={{ flex: 1 }}>
-                <label>Até</label>
-                <input type="date" value={eventFilters.to} onChange={(e) => setEventFilters({ ...eventFilters, to: e.target.value })} />
-              </div>
-              <div style={{ flex: 1 }}>
-                <label>Busca</label>
-                <input value={eventFilters.search} onChange={(e) => setEventFilters({ ...eventFilters, search: e.target.value })} placeholder="título/notas" />
-              </div>
-              <div style={{ alignSelf: 'flex-end' }}>
-                <button onClick={loadRemoteData} disabled={loadingData}>
-                  {loadingData ? 'Sincronizando...' : 'Filtrar'}
-                </button>
-              </div>
-            </div>
-
-            <div className="sep"></div>
-
-            <EventsTable
-              items={filteredEvents}
-              onEdit={(ev) => setEventForm(ev)}
-              onDelete={handleDeleteEvent}
-            />
-          </aside>
+        {renderAgenda()}
 
         </div>
       )}
 
-      {activePage === 'users' && isAdmin && (
+      {activeView === 'users' && isAdmin && (
         <div className="container single-card">
           <section className="card admin-card" id="adminUsersSection">
             <h2 className="title">Cadastro de Usuários</h2>
@@ -1236,6 +1230,20 @@ function App() {
               onDelete={handleDeleteUser}
             />
           </section>
+        </div>
+      )}
+
+      {activeView === 'workout' && (
+        <div className="container">
+          <div className="grid-agenda">
+            <WorkoutRoutine
+              apiBaseUrl={workoutApiBase}
+              profileId={profile?.id || session?.user?.id}
+              pushToast={pushToast}
+            />
+
+            {renderAgenda()}
+          </div>
         </div>
       )}
     </>
