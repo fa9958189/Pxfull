@@ -16,7 +16,7 @@ const MUSCLE_GROUPS = [
   { value: 'triceps', label: 'Tríceps', image: tricepsImg },
   { value: 'abs', label: 'Abdômen', image: absImg },
   { value: 'legs', label: 'Pernas', image: legsImg },
-  { value: 'glutes', label: 'Glúteos', image: glutesImg }
+  { value: 'glutes', label: 'Glúteos', image: glutesImg },
 ];
 
 const WEEK_DAYS = [
@@ -146,7 +146,9 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', profileId, pushT
       setLoading(true);
       await fetchJson(`${apiBaseUrl}/workout-routines/${id}`, { method: 'DELETE' });
       setWorkouts((prev) => prev.filter((item) => item.id !== id));
-      setSchedule((prev) => prev.map((slot) => (slot.workout_id === id ? { ...slot, workout_id: '' } : slot)));
+      setSchedule((prev) =>
+        prev.map((slot) => (slot.workout_id === id ? { ...slot, workout_id: '' } : slot))
+      );
       notify('Treino removido.', 'success');
     } catch (err) {
       console.warn('Erro ao excluir treino', err);
@@ -251,7 +253,11 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', profileId, pushT
                     {(item.muscleGroups || []).join(', ')}
                   </div>
                   <div>
-                    <button className="ghost small" onClick={() => handleDeleteWorkout(item.id)} disabled={loading}>
+                    <button
+                      className="ghost small"
+                      onClick={() => handleDeleteWorkout(item.id)}
+                      disabled={loading}
+                    >
                       Excluir
                     </button>
                   </div>
@@ -310,7 +316,11 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', profileId, pushT
           ))}
         </div>
         <div className="row" style={{ justifyContent: 'flex-end', marginTop: 12 }}>
-          <button className="primary" onClick={handleSaveSchedule} disabled={savingSchedule || !hasWorkouts}>
+          <button
+            className="primary"
+            onClick={handleSaveSchedule}
+            disabled={savingSchedule || !hasWorkouts}
+          >
             {savingSchedule ? 'Salvando...' : 'Salvar semana de treino'}
           </button>
         </div>
