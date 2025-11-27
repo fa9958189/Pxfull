@@ -55,9 +55,9 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', profileId, pushT
     const response = await fetch(url, {
       headers: {
         'Content-Type': 'application/json',
-        ...(options.headers || {})
+        ...(options.headers || {}),
       },
-      ...options
+      ...options,
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
