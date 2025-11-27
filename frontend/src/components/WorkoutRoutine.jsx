@@ -16,7 +16,7 @@ const MUSCLE_GROUPS = [
   { value: 'triceps', label: 'Tríceps', image: tricepsImg },
   { value: 'abs', label: 'Abdômen', image: absImg },
   { value: 'legs', label: 'Pernas', image: legsImg },
-  { value: 'glutes', label: 'Glúteos', image: glutesImg },
+  { value: 'glutes', label: 'Glúteos', image: glutesImg }
 ];
 
 const WEEK_DAYS = [
@@ -33,7 +33,7 @@ const defaultSchedule = WEEK_DAYS.map((day) => ({
   day,
   workout_id: '',
   time: '',
-  reminder: false,
+  reminder: false
 }));
 
 const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', profileId, pushToast }) => {
@@ -55,9 +55,9 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', profileId, pushT
     const response = await fetch(url, {
       headers: {
         'Content-Type': 'application/json',
-        ...(options.headers || {}),
+        ...(options.headers || {})
       },
-      ...options,
+      ...options
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
@@ -100,7 +100,7 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', profileId, pushT
         ...prev,
         muscleGroups: exists
           ? prev.muscleGroups.filter((item) => item !== group)
-          : [...prev.muscleGroups, group],
+          : [...prev.muscleGroups, group]
       };
     });
   };
@@ -120,11 +120,11 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', profileId, pushT
       const payload = {
         name: workoutForm.name,
         muscleGroups: workoutForm.muscleGroups,
-        userId: profileId,
+        userId: profileId
       };
       const saved = await fetchJson(`${apiBaseUrl}/workout-routines`, {
         method: 'POST',
-        body: JSON.stringify(payload),
+        body: JSON.stringify(payload)
       });
       setWorkoutForm({ name: '', muscleGroups: [] });
       if (saved && saved.id) {
@@ -170,7 +170,7 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', profileId, pushT
       const payload = { schedule, userId: profileId };
       await fetchJson(`${apiBaseUrl}/workout-schedule`, {
         method: 'POST',
-        body: JSON.stringify(payload),
+        body: JSON.stringify(payload)
       });
       notify('Semana de treino salva!', 'success');
     } catch (err) {
