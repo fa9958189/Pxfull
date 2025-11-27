@@ -1,14 +1,22 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import chestImg from '../assets/muscles/Peito.png';
+import backImg from '../assets/muscles/Costas.png';
+import shouldersImg from '../assets/muscles/Ombros.png';
+import bicepsImg from '../assets/muscles/Biceps.png';
+import tricepsImg from '../assets/muscles/Triceps.png';
+import absImg from '../assets/muscles/Abdomen.png';
+import legsImg from '../assets/muscles/Pernas.png';
+import glutesImg from '../assets/muscles/Gluteos.png';
 
 const MUSCLE_GROUPS = [
-  { value: 'chest', label: 'Peito' },
-  { value: 'back', label: 'Costas' },
-  { value: 'shoulders', label: 'Ombros' },
-  { value: 'biceps', label: 'Bíceps' },
-  { value: 'triceps', label: 'Tríceps' },
-  { value: 'abs', label: 'Abdômen' },
-  { value: 'legs', label: 'Pernas' },
-  { value: 'glutes', label: 'Glúteos' }
+  { value: 'chest', label: 'Peito', image: chestImg },
+  { value: 'back', label: 'Costas', image: backImg },
+  { value: 'shoulders', label: 'Ombros', image: shouldersImg },
+  { value: 'biceps', label: 'Bíceps', image: bicepsImg },
+  { value: 'triceps', label: 'Tríceps', image: tricepsImg },
+  { value: 'abs', label: 'Abdômen', image: absImg },
+  { value: 'legs', label: 'Pernas', image: legsImg },
+  { value: 'glutes', label: 'Glúteos', image: glutesImg }
 ];
 
 const WEEK_DAYS = [
@@ -200,17 +208,20 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', profileId, pushT
 
           <div className="sep" style={{ margin: '12px 0 6px' }}></div>
           <div className="muted" style={{ marginBottom: 6, fontSize: 13 }}>Grupos musculares</div>
-          <div className="tabs" style={{ flexWrap: 'wrap', gap: 8 }}>
+          <div className="muscle-grid">
             {MUSCLE_GROUPS.map((group) => {
               const active = workoutForm.muscleGroups.includes(group.value);
               return (
                 <button
                   key={group.value}
                   type="button"
-                  className={active ? 'tab active' : 'tab'}
+                  className={active ? 'muscle-card active' : 'muscle-card'}
                   onClick={() => toggleMuscleGroup(group.value)}
                 >
-                  {group.label}
+                  <div className="muscle-image-wrapper">
+                    <img src={group.image} alt={group.label} className="muscle-image" />
+                  </div>
+                  <span className="muscle-label">{group.label}</span>
                 </button>
               );
             })}
