@@ -36,12 +36,27 @@ const defaultSchedule = WEEK_DAYS.map((day) => ({
   reminder: false
 }));
 
-const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', profileId, pushToast }) => {
+const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', pushToast }) => {
   const [workoutForm, setWorkoutForm] = useState({ name: '', muscleGroups: [] });
   const [workouts, setWorkouts] = useState([]);
   const [schedule, setSchedule] = useState(defaultSchedule);
   const [loading, setLoading] = useState(false);
   const [savingSchedule, setSavingSchedule] = useState(false);
+  const [userId, setUserId] = useState('');
+
+  const supabase = useMemo(() => {
+    const { supabaseUrl, supabaseAnonKey, authSchema } = window.APP_CONFIG || {};
+    if (!supabaseUrl || !supabaseAnonKey || !window.supabase) return null;
+
+    return window.supabase.createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        detectSessionInUrl: true,
+        persistSession: true,
+        storageKey: 'gp-react-session',
+        schema: authSchema || 'public'
+      }
+    });
+  }, []);
 
   const hasWorkouts = useMemo(() => workouts.length > 0, [workouts]);
 
@@ -68,12 +83,12 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', profileId, pushT
 
   const loadWorkouts = async () => {
     try {
-      if (!profileId) {
+      if (!userId) {
         notify('Perfil do usuário não carregado.', 'warning');
         return;
       }
       setLoading(true);
-      const data = await fetchJson(`${apiBaseUrl}/workout-routines?user_id=${profileId}`);
+      const data = await fetchJson(`${apiBaseUrl}/workout-routines?user_id=${userId}`);
       setWorkouts(Array.isArray(data) ? data : data?.items || []);
     } catch (err) {
       console.error('Erro ao carregar treinos', err);
@@ -85,11 +100,11 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', profileId, pushT
 
   const loadSchedule = async () => {
     try {
-      if (!profileId) {
+      if (!userId) {
         notify('Perfil do usuário não carregado.', 'warning');
         return;
       }
-      const data = await fetchJson(`${apiBaseUrl}/workout-schedule?user_id=${profileId}`);
+      const data = await fetchJson(`${apiBaseUrl}/workout-schedule?user_id=${userId}`);
       if (Array.isArray(data)) {
         setSchedule(defaultSchedule.map((slot, idx) => ({ ...slot, ...(data[idx] || {}) })));
       } else if (Array.isArray(data?.items)) {
@@ -128,8 +143,8 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', profileId, pushT
       const payload = {
         name: workoutForm.name,
         muscleGroups: workoutForm.muscleGroups,
-        userId: profileId,
-        user_id: profileId
+        userId,
+        user_id: userId
       };
       const saved = await fetchJson(`${apiBaseUrl}/workout-routines`, {
         method: 'POST',
@@ -153,7 +168,7 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', profileId, pushT
   const handleDeleteWorkout = async (id) => {
     try {
       setLoading(true);
-      await fetchJson(`${apiBaseUrl}/workout-routines/${id}?user_id=${profileId}`, {
+      await fetchJson(`${apiBaseUrl}/workout-routines/${id}?user_id=${userId}`, {
         method: 'DELETE'
       });
       setWorkouts((prev) => prev.filter((item) => item.id !== id));
@@ -178,7 +193,7 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', profileId, pushT
   const handleSaveSchedule = async () => {
     try {
       setSavingSchedule(true);
-      const payload = { schedule, userId: profileId, user_id: profileId };
+      const payload = { schedule, userId, user_id: userId };
       await fetchJson(`${apiBaseUrl}/workout-schedule`, {
         method: 'POST',
         body: JSON.stringify(payload)
@@ -193,11 +208,37 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', profileId, pushT
   };
 
   useEffect(() => {
-    if (!profileId) return;
+    if (!supabase) return;
+
+    const fetchUserId = async () => {
+      try {
+        const {
+          data: { user },
+          error,
+        } = await supabase.auth.getUser();
+
+        if (error || !user?.id) {
+          notify('Usuário não autenticado.', 'warning');
+          return;
+        }
+
+        setUserId(user.id);
+      } catch (err) {
+        console.error('Erro ao buscar usuário autenticado', err);
+        notify('Não foi possível carregar o usuário.', 'danger');
+      }
+    };
+
+    fetchUserId();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [supabase]);
+
+  useEffect(() => {
+    if (!userId) return;
     loadWorkouts();
     loadSchedule();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profileId]);
+  }, [userId]);
 
   return (
     <section className="card" style={{ marginTop: 16 }}>
