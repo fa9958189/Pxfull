@@ -1241,8 +1241,6 @@ function App() {
               profileId={profile?.id || session?.user?.id}
               pushToast={pushToast}
             />
-
-            {renderAgenda()}
           </div>
         </div>
       )}

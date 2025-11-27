@@ -391,3 +391,76 @@ canvas{ background:transparent; }
 .toast-danger{ border-left-color:var(--danger); }
 .toast-success{ border-left-color:var(--accent); }
 .toast button{ margin-left:auto; }
+
+.muscle-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 16px;
+  margin-top: 12px;
+}
+
+.muscle-card {
+  background: var(--card-2, #101522);
+  border: 1px solid var(--border, #232838);
+  border-radius: 999px;
+  padding: 14px 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.muscle-image-wrapper {
+  width: 88px;
+  height: 88px;
+  border-radius: 999px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.muscle-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.muscle-label {
+  font-size: 13px;
+  color: var(--muted, #aab2c0);
+}
+
+.muscle-card.active {
+  border-color: var(--accent, #4ade80);
+  box-shadow: 0 0 0 1px rgba(74, 222, 128, 0.35);
+}
+
+.muscle-card.active .muscle-label {
+  color: var(--text, #e5e7eb);
+}
+
+.muscle-card:hover {
+  transform: translateY(-1px);
+}
+
+.workout-card {
+  margin-top: 16px;
+  max-width: 1120px;
+  width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+@media (max-width: 768px) {
+  .workout-card .row {
+    flex-wrap: wrap;
+  }
+}
+
+.workout-schedule {
+  display: none;
+}
+
