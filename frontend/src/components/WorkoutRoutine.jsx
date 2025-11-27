@@ -1,14 +1,15 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import muscleTestImg from '../assets/muscles/fototeste.png';
 
 const MUSCLE_GROUPS = [
-  { value: 'chest', label: 'Peito' },
-  { value: 'back', label: 'Costas' },
-  { value: 'shoulders', label: 'Ombros' },
-  { value: 'biceps', label: 'Bíceps' },
-  { value: 'triceps', label: 'Tríceps' },
-  { value: 'abs', label: 'Abdômen' },
-  { value: 'legs', label: 'Pernas' },
-  { value: 'glutes', label: 'Glúteos' }
+  { value: 'chest', label: 'Peito', image: muscleTestImg },
+  { value: 'back', label: 'Costas', image: muscleTestImg },
+  { value: 'shoulders', label: 'Ombros', image: muscleTestImg },
+  { value: 'biceps', label: 'Bíceps', image: muscleTestImg },
+  { value: 'triceps', label: 'Tríceps', image: muscleTestImg },
+  { value: 'abs', label: 'Abdômen', image: muscleTestImg },
+  { value: 'legs', label: 'Pernas', image: muscleTestImg },
+  { value: 'glutes', label: 'Glúteos', image: muscleTestImg }
 ];
 
 const WEEK_DAYS = [
@@ -200,17 +201,20 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', profileId, pushT
 
           <div className="sep" style={{ margin: '12px 0 6px' }}></div>
           <div className="muted" style={{ marginBottom: 6, fontSize: 13 }}>Grupos musculares</div>
-          <div className="tabs" style={{ flexWrap: 'wrap', gap: 8 }}>
+          <div className="muscle-grid">
             {MUSCLE_GROUPS.map((group) => {
               const active = workoutForm.muscleGroups.includes(group.value);
               return (
                 <button
                   key={group.value}
                   type="button"
-                  className={active ? 'tab active' : 'tab'}
+                  className={active ? 'muscle-card active' : 'muscle-card'}
                   onClick={() => toggleMuscleGroup(group.value)}
                 >
-                  {group.label}
+                  <div className="muscle-image-wrapper">
+                    <img src={group.image} alt={group.label} className="muscle-image" />
+                  </div>
+                  <span className="muscle-label">{group.label}</span>
                 </button>
               );
             })}
