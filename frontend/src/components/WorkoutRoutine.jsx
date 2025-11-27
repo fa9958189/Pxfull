@@ -55,9 +55,9 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', profileId, pushT
     const response = await fetch(url, {
       headers: {
         'Content-Type': 'application/json',
-        ...(options.headers || {})
+        ...(options.headers || {}),
       },
-      ...options
+      ...options,
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
@@ -68,11 +68,15 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', profileId, pushT
 
   const loadWorkouts = async () => {
     try {
+      if (!profileId) {
+        notify('Perfil do usuário não carregado.', 'warning');
+        return;
+      }
       setLoading(true);
-      const data = await fetchJson(`${apiBaseUrl}/workout-routines`);
+      const data = await fetchJson(`${apiBaseUrl}/workout-routines?user_id=${profileId}`);
       setWorkouts(Array.isArray(data) ? data : data?.items || []);
     } catch (err) {
-      console.warn('Erro ao carregar treinos', err);
+      console.error('Erro ao carregar treinos', err);
       notify('Não foi possível carregar os treinos.');
     } finally {
       setLoading(false);
@@ -81,14 +85,18 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', profileId, pushT
 
   const loadSchedule = async () => {
     try {
-      const data = await fetchJson(`${apiBaseUrl}/workout-schedule`);
+      if (!profileId) {
+        notify('Perfil do usuário não carregado.', 'warning');
+        return;
+      }
+      const data = await fetchJson(`${apiBaseUrl}/workout-schedule?user_id=${profileId}`);
       if (Array.isArray(data)) {
         setSchedule(defaultSchedule.map((slot, idx) => ({ ...slot, ...(data[idx] || {}) })));
       } else if (Array.isArray(data?.items)) {
         setSchedule(defaultSchedule.map((slot, idx) => ({ ...slot, ...(data.items[idx] || {}) })));
       }
     } catch (err) {
-      console.warn('Erro ao carregar semana de treino', err);
+      console.error('Erro ao carregar semana de treino', err);
       notify('Não foi possível carregar a semana de treino.');
     }
   };
@@ -120,7 +128,8 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', profileId, pushT
       const payload = {
         name: workoutForm.name,
         muscleGroups: workoutForm.muscleGroups,
-        userId: profileId
+        userId: profileId,
+        user_id: profileId
       };
       const saved = await fetchJson(`${apiBaseUrl}/workout-routines`, {
         method: 'POST',
@@ -144,7 +153,9 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', profileId, pushT
   const handleDeleteWorkout = async (id) => {
     try {
       setLoading(true);
-      await fetchJson(`${apiBaseUrl}/workout-routines/${id}`, { method: 'DELETE' });
+      await fetchJson(`${apiBaseUrl}/workout-routines/${id}?user_id=${profileId}`, {
+        method: 'DELETE'
+      });
       setWorkouts((prev) => prev.filter((item) => item.id !== id));
       setSchedule((prev) =>
         prev.map((slot) => (slot.workout_id === id ? { ...slot, workout_id: '' } : slot))
@@ -167,7 +178,7 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', profileId, pushT
   const handleSaveSchedule = async () => {
     try {
       setSavingSchedule(true);
-      const payload = { schedule, userId: profileId };
+      const payload = { schedule, userId: profileId, user_id: profileId };
       await fetchJson(`${apiBaseUrl}/workout-schedule`, {
         method: 'POST',
         body: JSON.stringify(payload)
@@ -182,10 +193,11 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', profileId, pushT
   };
 
   useEffect(() => {
+    if (!profileId) return;
     loadWorkouts();
     loadSchedule();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [profileId]);
 
   return (
     <section className="card" style={{ marginTop: 16 }}>
