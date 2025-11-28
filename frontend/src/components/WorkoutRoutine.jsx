@@ -62,8 +62,37 @@ const defaultSchedule = WEEK_DAYS.map((day) => ({
   reminder: false
 }));
 
+const exerciseHelp = {
+  'Supino reto': {
+    videoUrl: 'https://www.youtube.com/embed/VjERUCFVFds',
+    tips: 'Mantenha escápulas estabilizadas, pés firmes e controle a descida.'
+  },
+  'Agachamento livre': {
+    videoUrl: 'https://www.youtube.com/embed/bEv6CCg2BC8',
+    tips: 'Coluna neutra, joelhos alinhados e desça até onde mantiver a postura.'
+  },
+  'Remada curvada': {
+    videoUrl: 'https://www.youtube.com/embed/LXn8SFOE9ag',
+    tips: 'Incline o tronco, mantenha abdômen firme e puxe com as costas.'
+  }
+};
+
+const createId = () => (crypto?.randomUUID ? crypto.randomUUID() : Math.random().toString(16).slice(2));
+
+const formatExerciseResume = (exercise) => {
+  const base = `${exercise.name || 'Exercício'} ${exercise.sets || 0}x${exercise.reps || 0}`;
+  const weightPart = exercise.weight ? ` – ${exercise.weight}kg` : '';
+  return `${base}${weightPart}`;
+};
+
 const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', pushToast }) => {
-  const [workoutForm, setWorkoutForm] = useState({ name: '', muscleGroups: [] });
+  const [activeTab, setActiveTab] = useState('config');
+  const [workoutForm, setWorkoutForm] = useState({
+    id: null,
+    name: '',
+    muscleGroups: [],
+    exercises: [],
+  });
   const [selectedSports, setSelectedSports] = useState([]);
   const [workouts, setWorkouts] = useState([]);
   const [schedule, setSchedule] = useState(defaultSchedule);
@@ -72,29 +101,16 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', pushToast }) => 
   const [userId, setUserId] = useState('');
   const [selectedWorkout, setSelectedWorkout] = useState(null);
   const [showWorkoutModal, setShowWorkoutModal] = useState(false);
-
-  const normalizeWorkoutFromApi = (item) => {
-    const rawGroups =
-      Array.isArray(item.muscleGroups)
-        ? item.muscleGroups
-        : typeof item.muscle_groups === 'string'
-          ? item.muscle_groups.split(',').map((g) => g.trim()).filter(Boolean)
-          : [];
-
-    const rawSports = Array.isArray(item.sports)
-      ? item.sports
-      : typeof item.sports === 'string'
-        ? item.sports.split(',').map((s) => s.trim()).filter(Boolean)
-        : typeof item.sports_list === 'string'
-          ? item.sports_list.split(',').map((s) => s.trim()).filter(Boolean)
-          : [];
-
-    return {
-      ...item,
-      muscleGroups: rawGroups,
-      sports: rawSports,
-    };
-  };
+  const [exerciseModalGroup, setExerciseModalGroup] = useState(null);
+  const [restDuration, setRestDuration] = useState(60);
+  const [restCountdown, setRestCountdown] = useState(0);
+  const [restRunning, setRestRunning] = useState(false);
+  const [restFinished, setRestFinished] = useState(false);
+  const [sessions, setSessions] = useState([]);
+  const [historyRange, setHistoryRange] = useState({ from: '', to: '' });
+  const [progress, setProgress] = useState({ totalSessions: 0, byMuscleGroup: {} });
+  const [createReminder, setCreateReminder] = useState(false);
+  const [sessionReminder, setSessionReminder] = useState(false);
 
   const muscleMap = useMemo(
     () =>
@@ -136,7 +152,6 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', pushToast }) => 
 
   const hasWorkouts = useMemo(() => workouts.length > 0, [workouts]);
 
-  // Detalhes dos músculos do treino selecionado (pra usar no modal)
   const selectedMuscleDetails = useMemo(() => {
     if (!selectedWorkout || !Array.isArray(selectedWorkout.muscleGroups)) return [];
 
@@ -174,6 +189,29 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', pushToast }) => 
     return data;
   };
 
+  const normalizeWorkoutFromApi = (item) => {
+    const rawGroups = Array.isArray(item.muscleGroups)
+      ? item.muscleGroups
+      : typeof item.muscle_groups === 'string'
+        ? item.muscle_groups.split(',').map((g) => g.trim()).filter(Boolean)
+        : [];
+
+    const rawSports = Array.isArray(item.sports)
+      ? item.sports
+      : typeof item.sports === 'string'
+        ? item.sports.split(',').map((s) => s.trim()).filter(Boolean)
+        : typeof item.sports_list === 'string'
+          ? item.sports_list.split(',').map((s) => s.trim()).filter(Boolean)
+          : [];
+
+    return {
+      ...item,
+      muscleGroups: rawGroups,
+      sports: rawSports,
+      exercises: Array.isArray(item.exercises) ? item.exercises : [],
+    };
+  };
+
   const loadWorkouts = async () => {
     try {
       if (!userId) {
@@ -181,7 +219,7 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', pushToast }) => 
         return;
       }
       setLoading(true);
-      const data = await fetchJson(`${apiBaseUrl}/workout-routines?user_id=${userId}`);
+      const data = await fetchJson(`${apiBaseUrl}/api/workouts/templates?userId=${userId}`);
       const raw = Array.isArray(data) ? data : data?.items || [];
       const normalized = raw.map(normalizeWorkoutFromApi);
       setWorkouts(normalized);
@@ -211,6 +249,31 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', pushToast }) => 
     }
   };
 
+  const loadSessions = async () => {
+    try {
+      if (!userId) return;
+      const query = new URLSearchParams({ userId });
+      if (historyRange.from) query.append('from', historyRange.from);
+      if (historyRange.to) query.append('to', historyRange.to);
+      const data = await fetchJson(`${apiBaseUrl}/api/workouts/sessions?${query.toString()}`);
+      setSessions(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error('Erro ao carregar histórico', err);
+      notify('Não foi possível carregar o histórico de treinos.');
+    }
+  };
+
+  const loadProgress = async () => {
+    try {
+      if (!userId) return;
+      const data = await fetchJson(`${apiBaseUrl}/api/workouts/progress?userId=${userId}&period=month`);
+      setProgress(data || { totalSessions: 0, byMuscleGroup: {} });
+    } catch (err) {
+      console.error('Erro ao carregar progresso', err);
+      notify('Não foi possível carregar o progresso.');
+    }
+  };
+
   const toggleMuscleGroup = (group) => {
     setWorkoutForm((prev) => {
       const exists = prev.muscleGroups.includes(group);
@@ -221,6 +284,7 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', pushToast }) => 
           : [...prev.muscleGroups, group]
       };
     });
+    setExerciseModalGroup(group);
   };
 
   const toggleSport = (sportValue) => {
@@ -228,6 +292,41 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', pushToast }) => 
       const exists = prev.includes(sportValue);
       return exists ? prev.filter((item) => item !== sportValue) : [...prev, sportValue];
     });
+  };
+
+  const handleExerciseChange = (exerciseId, field, value) => {
+    setWorkoutForm((prev) => ({
+      ...prev,
+      exercises: prev.exercises.map((ex) => (ex.id === exerciseId ? { ...ex, [field]: value } : ex)),
+    }));
+  };
+
+  const handleAddExercise = (muscleGroupId) => {
+    const base = {
+      id: createId(),
+      muscleGroupId,
+      name: '',
+      sets: 3,
+      reps: 12,
+      weight: null,
+      restSeconds: 60,
+      notes: '',
+      completed: false,
+    };
+    setWorkoutForm((prev) => ({
+      ...prev,
+      muscleGroups: prev.muscleGroups.includes(muscleGroupId)
+        ? prev.muscleGroups
+        : [...prev.muscleGroups, muscleGroupId],
+      exercises: [...prev.exercises, base],
+    }));
+  };
+
+  const handleRemoveExercise = (exerciseId) => {
+    setWorkoutForm((prev) => ({
+      ...prev,
+      exercises: prev.exercises.filter((ex) => ex.id !== exerciseId),
+    }));
   };
 
   const handleSaveWorkout = async () => {
@@ -243,22 +342,39 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', pushToast }) => 
     try {
       setLoading(true);
       const payload = {
-        name: workoutForm.name,
-        muscleGroups: workoutForm.muscleGroups,
+        ...workoutForm,
+        exercises: workoutForm.exercises,
         sports: selectedSports,
         userId,
-        user_id: userId
       };
-      const saved = await fetchJson(`${apiBaseUrl}/workout-routines`, {
-        method: 'POST',
-        body: JSON.stringify(payload)
+      const url = workoutForm.id
+        ? `${apiBaseUrl}/api/workouts/templates/${workoutForm.id}`
+        : `${apiBaseUrl}/api/workouts/templates`;
+      const method = workoutForm.id ? 'PUT' : 'POST';
+      const saved = await fetchJson(url, {
+        method,
+        body: JSON.stringify(payload),
       });
-      setWorkoutForm({ name: '', muscleGroups: [] });
+      setWorkoutForm({ id: null, name: '', muscleGroups: [], exercises: [] });
       setSelectedSports([]);
       if (saved && saved.id) {
-        setWorkouts((prev) => [normalizeWorkoutFromApi(saved), ...prev]);
+        setWorkouts((prev) => {
+          const others = prev.filter((w) => w.id !== saved.id);
+          return [normalizeWorkoutFromApi(saved), ...others];
+        });
       } else {
         await loadWorkouts();
+      }
+      if (createReminder) {
+        const reminderPayload = {
+          type: 'workout',
+          workoutName: saved?.name || workoutForm.name,
+          date: new Date().toISOString().slice(0, 10),
+        };
+        await fetchJson(`${apiBaseUrl}/api/workouts/reminders`, {
+          method: 'POST',
+          body: JSON.stringify(reminderPayload),
+        });
       }
       notify('Treino salvo com sucesso!', 'success');
     } catch (err) {
@@ -272,7 +388,7 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', pushToast }) => 
   const handleDeleteWorkout = async (id) => {
     try {
       setLoading(true);
-      await fetchJson(`${apiBaseUrl}/workout-routines/${id}?user_id=${userId}`, {
+      await fetchJson(`${apiBaseUrl}/api/workouts/templates/${id}?userId=${userId}`, {
         method: 'DELETE'
       });
       setWorkouts((prev) => prev.filter((item) => item.id !== id));
@@ -311,6 +427,48 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', pushToast }) => 
     }
   };
 
+  const handleCompleteTodayWorkout = async () => {
+    if (!workoutForm.name) {
+      notify('Selecione um treino para concluir.', 'warning');
+      return;
+    }
+    const sessionPayload = {
+      userId,
+      templateId: workoutForm.id || null,
+      date: new Date().toISOString().slice(0, 10),
+      name: workoutForm.name,
+      muscleGroups: workoutForm.muscleGroups,
+      exercises: workoutForm.exercises.map((ex) => ({
+        ...ex,
+        completed: true,
+      })),
+      completed: true,
+    };
+
+    try {
+      const saved = await fetchJson(`${apiBaseUrl}/api/workouts/sessions`, {
+        method: 'POST',
+        body: JSON.stringify(sessionPayload),
+      });
+      setSessions((prev) => [saved, ...prev]);
+      if (sessionReminder) {
+        const reminderPayload = {
+          type: 'workout',
+          workoutName: saved?.name || workoutForm.name,
+          date: saved?.date || sessionPayload.date,
+        };
+        await fetchJson(`${apiBaseUrl}/api/workouts/reminders`, {
+          method: 'POST',
+          body: JSON.stringify(reminderPayload),
+        });
+      }
+      notify('Treino de hoje concluído!', 'success');
+    } catch (err) {
+      console.error('Erro ao concluir treino', err);
+      notify('Não foi possível registrar o treino de hoje.', 'danger');
+    }
+  };
+
   useEffect(() => {
     if (!supabase) return;
 
@@ -344,311 +502,513 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', pushToast }) => 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId]);
 
+  useEffect(() => {
+    if (activeTab === 'history') {
+      loadSessions();
+    } else if (activeTab === 'progress') {
+      loadProgress();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, historyRange]);
+
+  useEffect(() => {
+    if (!restRunning) return;
+    if (restCountdown <= 0) {
+      setRestRunning(false);
+      setRestFinished(true);
+      return;
+    }
+    const timer = setTimeout(() => setRestCountdown((prev) => prev - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [restRunning, restCountdown]);
+
+  const startRestTimer = () => {
+    setRestFinished(false);
+    setRestCountdown(restDuration);
+    setRestRunning(true);
+  };
+
+  const filteredExercises = workoutForm.exercises.filter(
+    (ex) => ex.muscleGroupId === exerciseModalGroup
+  );
+
   return (
     <section className="card" style={{ marginTop: 16 }}>
       <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
         <h3 className="title" style={{ margin: 0 }}>Rotina de Treino</h3>
         <div className="muted" style={{ fontSize: 13 }}>
-          Gerencie treinos e a programação semanal.
+          Monte templates detalhados, salve o histórico e acompanhe o progresso.
         </div>
       </div>
 
-      <div className="sep"></div>
+      <div className="sep" style={{ marginTop: 12 }}></div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-        {/* NOVO TREINO */}
-        <div>
-          <h4 className="title" style={{ marginBottom: 12 }}>Novo Treino</h4>
-          <label>Nome do treino</label>
-          <input
-            value={workoutForm.name}
-            onChange={(e) => setWorkoutForm({ ...workoutForm, name: e.target.value })}
-            placeholder="Ex.: Treino A – Peito e Tríceps"
-          />
+      <div className="row" style={{ gap: 12, margin: '10px 0 18px' }}>
+        <button
+          className={activeTab === 'config' ? 'primary' : 'ghost'}
+          onClick={() => setActiveTab('config')}
+        >
+          Configuração
+        </button>
+        <button
+          className={activeTab === 'history' ? 'primary' : 'ghost'}
+          onClick={() => setActiveTab('history')}
+        >
+          Histórico
+        </button>
+        <button
+          className={activeTab === 'progress' ? 'primary' : 'ghost'}
+          onClick={() => setActiveTab('progress')}
+        >
+          Progresso
+        </button>
+      </div>
 
-          <div className="sep" style={{ margin: '12px 0 6px' }}></div>
-          <div className="muted" style={{ marginBottom: 6, fontSize: 13 }}>Grupos musculares</div>
-          <div className="muscle-grid">
-            {MUSCLE_GROUPS.map((group) => {
-              const active = workoutForm.muscleGroups.includes(group.value);
-              return (
-                <button
-                  key={group.value}
-                  type="button"
-                  className={active ? 'muscle-card active' : 'muscle-card'}
-                  onClick={() => toggleMuscleGroup(group.value)}
-                >
-                  <div className="muscle-image-wrapper">
-                    <img src={group.image} alt={group.label} className="muscle-image" />
-                  </div>
-                  <span className="muscle-label">{group.label}</span>
-                </button>
-              );
-            })}
-          </div>
+      {activeTab === 'config' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+          {/* NOVO TREINO */}
+          <div>
+            <h4 className="title" style={{ marginBottom: 12 }}>Novo Template de Treino</h4>
+            <label>Nome do treino</label>
+            <input
+              value={workoutForm.name}
+              onChange={(e) => setWorkoutForm({ ...workoutForm, name: e.target.value })}
+              placeholder="Ex.: Treino A – Peito e Tríceps"
+            />
 
-          <div className="muted" style={{ margin: '14px 0 6px', fontSize: 13 }}>
-            Esportes / atividades
-          </div>
-          <div className="muscle-grid">
-            {SPORTS.map((sport) => {
-              const active = selectedSports.includes(sport.value);
-              return (
-                <button
-                  key={sport.value}
-                  type="button"
-                  className={active ? 'muscle-card active' : 'muscle-card'}
-                  onClick={() => toggleSport(sport.value)}
-                >
-                  <div className="muscle-image-wrapper">
-                    <img src={sport.image} alt={sport.label} className="muscle-image" />
-                  </div>
-                  <span className="muscle-label">{sport.label}</span>
-                </button>
-              );
-            })}
-          </div>
-
-          <div className="row" style={{ justifyContent: 'flex-end', marginTop: 12 }}>
-            <button className="primary" onClick={handleSaveWorkout} disabled={loading}>
-              {loading ? 'Salvando...' : 'Salvar treino'}
-            </button>
-          </div>
-        </div>
-
-        {/* TREINOS CADASTRADOS */}
-        <div>
-          <h4 className="title" style={{ marginBottom: 12 }}>Treinos cadastrados</h4>
-          {!workouts.length && <div className="muted">Nenhum treino cadastrado.</div>}
-          {workouts.length > 0 && (
-            <div className="table">
-              {workouts.map((item) => (
-                <div className="table-row" key={item.id || item.name}>
-                  <div>{item.name}</div>
-                  <div className="muted" style={{ fontSize: 13 }}>
-                    {(item.muscleGroups || [])
-                      .map((group) => muscleMap[group]?.label || group)
-                      .join(', ')}
-                  </div>
-                  {(item.sports || []).length > 0 && (
-                    <div className="muted" style={{ fontSize: 13 }}>
-                      {`Esportes: ${(item.sports || [])
-                        .map((sport) => sportsMap[sport]?.label || sport)
-                        .join(', ')}`}
+            <div className="sep" style={{ margin: '12px 0 6px' }}></div>
+            <div className="muted" style={{ marginBottom: 6, fontSize: 13 }}>Grupos musculares</div>
+            <div className="muscle-grid">
+              {MUSCLE_GROUPS.map((group) => {
+                const active = workoutForm.muscleGroups.includes(group.value);
+                return (
+                  <button
+                    key={group.value}
+                    type="button"
+                    className={active ? 'muscle-card active' : 'muscle-card'}
+                    onClick={() => toggleMuscleGroup(group.value)}
+                  >
+                    <div className="muscle-image-wrapper">
+                      <img src={group.image} alt={group.label} className="muscle-image" />
                     </div>
-                  )}
-                  <div className="row" style={{ gap: 8, justifyContent: 'flex-end' }}>
-                    <button
-                      className="ghost small"
-                      onClick={() => {
-                        setSelectedWorkout(item);
-                        setShowWorkoutModal(true);
+                    <span className="muscle-label">{group.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="muted" style={{ margin: '14px 0 6px', fontSize: 13 }}>
+              Esportes / atividades
+            </div>
+            <div className="muscle-grid">
+              {SPORTS.map((sport) => {
+                const active = selectedSports.includes(sport.value);
+                return (
+                  <button
+                    key={sport.value}
+                    type="button"
+                    className={active ? 'muscle-card active' : 'muscle-card'}
+                    onClick={() => toggleSport(sport.value)}
+                  >
+                    <div className="muscle-image-wrapper">
+                      <img src={sport.image} alt={sport.label} className="muscle-image" />
+                    </div>
+                    <span className="muscle-label">{sport.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="row" style={{ gap: 12, alignItems: 'center', marginTop: 10 }}>
+              <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <input
+                  type="checkbox"
+                  checked={createReminder}
+                  onChange={(e) => setCreateReminder(e.target.checked)}
+                />
+                Criar lembrete para este treino
+              </label>
+              <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <input
+                  type="checkbox"
+                  checked={sessionReminder}
+                  onChange={(e) => setSessionReminder(e.target.checked)}
+                />
+                Criar lembrete ao concluir
+              </label>
+            </div>
+
+            <div className="row" style={{ justifyContent: 'space-between', marginTop: 12 }}>
+              <button
+                className="ghost"
+                disabled={!workoutForm.id}
+                onClick={() => setWorkoutForm({ id: null, name: '', muscleGroups: [], exercises: [] })}
+              >
+                Limpar edição
+              </button>
+              <div className="row" style={{ gap: 8 }}>
+                <button className="ghost" onClick={handleCompleteTodayWorkout} disabled={!workoutForm.name}>
+                  Concluir treino de hoje
+                </button>
+                <button className="primary" onClick={handleSaveWorkout} disabled={loading}>
+                  {loading ? 'Salvando...' : workoutForm.id ? 'Atualizar template' : 'Salvar template'}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* TREINOS CADASTRADOS */}
+          <div>
+            <h4 className="title" style={{ marginBottom: 12 }}>Treinos cadastrados</h4>
+            {!workouts.length && <div className="muted">Nenhum treino cadastrado.</div>}
+            {workouts.length > 0 && (
+              <div className="table">
+                {workouts.map((item) => (
+                  <div className="table-row" key={item.id || item.name}>
+                    <div>
+                      <div style={{ fontWeight: 600 }}>{item.name}</div>
+                      <div className="muted" style={{ fontSize: 13 }}>
+                        {(item.muscleGroups || [])
+                          .map((group) => muscleMap[group]?.label || group)
+                          .join(', ')}
+                      </div>
+                      {(item.exercises || []).length > 0 && (
+                        <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
+                          {(item.exercises || []).slice(0, 2).map(formatExerciseResume).join('; ')}
+                          {item.exercises.length > 2 ? '...' : ''}
+                        </div>
+                      )}
+                    </div>
+                    <div className="row" style={{ gap: 8, justifyContent: 'flex-end' }}>
+                      <button
+                        className="ghost small"
+                        onClick={() => {
+                          setWorkoutForm({
+                            id: item.id,
+                            name: item.name,
+                            muscleGroups: item.muscleGroups || [],
+                            exercises: item.exercises || [],
+                          });
+                          setSelectedWorkout(item);
+                          setSelectedSports(item.sports || []);
+                          setShowWorkoutModal(true);
+                        }}
+                        disabled={loading}
+                      >
+                        Editar treino
+                      </button>
+                      <button
+                        className="ghost small"
+                        onClick={() => handleDeleteWorkout(item.id)}
+                        disabled={loading}
+                      >
+                        Excluir
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="sep" style={{ margin: '18px 0' }}></div>
+
+          {/* SEMANA DE TREINO */}
+          <div>
+            <h4 className="title" style={{ marginBottom: 12 }}>Semana de Treino</h4>
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+                gap: 16,
+              }}
+            >
+              {schedule.map((slot) => (
+                <div
+                  key={slot.day}
+                  style={{
+                    borderRadius: 12,
+                    background: '#131722',
+                    padding: 16,
+                    boxShadow: '0 12px 30px rgba(0, 0, 0, 0.15)',
+                    border: '1px solid rgba(255,255,255,0.08)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 12,
+                  }}
+                >
+                  <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600 }}>
+                      <span
+                        style={{
+                          display: 'inline-flex',
+                          width: 32,
+                          height: 32,
+                          borderRadius: 8,
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          background: 'rgba(255, 255, 255, 0.06)',
+                        }}
+                      >
+                        📅
+                      </span>
+                      {slot.day.toUpperCase()}
+                    </div>
+                    {slot.workout_id && (
+                      <span
+                        style={{
+                          padding: '4px 10px',
+                          borderRadius: 12,
+                          background: 'rgba(80, 190, 120, 0.15)',
+                          color: '#50be78',
+                          fontSize: 12,
+                          fontWeight: 600,
+                        }}
+                      >
+                        Treino ativo
+                      </span>
+                    )}
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <label style={{ fontSize: 13, color: '#9ba4b5' }}>Treino</label>
+                    <select
+                      value={slot.workout_id}
+                      onChange={(e) => handleScheduleChange(slot.day, 'workout_id', e.target.value)}
+                      style={{
+                        background: '#0f131c',
+                        border: '1px solid rgba(255,255,255,0.08)',
+                        color: '#fff',
+                        borderRadius: 10,
+                        padding: '10px 12px',
                       }}
-                      disabled={loading}
                     >
-                      Ver treino
-                    </button>
-                    <button
-                      className="ghost small"
-                      onClick={() => handleDeleteWorkout(item.id)}
-                      disabled={loading}
+                      <option value="">Selecione um treino</option>
+                      {workouts.map((item) => (
+                        <option key={item.id || item.name} value={item.id}>
+                          {item.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <label style={{ fontSize: 13, color: '#9ba4b5' }}>Horário</label>
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 8,
+                        background: '#0f131c',
+                        border: '1px solid rgba(255,255,255,0.08)',
+                        borderRadius: 10,
+                        padding: '8px 12px',
+                      }}
                     >
-                      Excluir
-                    </button>
+                      <span role="img" aria-label="Relógio">
+                        🕒
+                      </span>
+                      <input
+                        type="time"
+                        value={slot.time}
+                        onChange={(e) => handleScheduleChange(slot.day, 'time', e.target.value)}
+                        style={{
+                          flex: 1,
+                          border: 'none',
+                          background: 'transparent',
+                          color: '#fff',
+                          outline: 'none',
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <label style={{ fontSize: 13, color: '#9ba4b5' }}>Lembrete</label>
+                    <label
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        background: '#0f131c',
+                        borderRadius: 12,
+                        padding: '10px 12px',
+                        border: '1px solid rgba(255,255,255,0.08)',
+                      }}
+                    >
+                      <span style={{ color: '#d3d8e6' }}>Ativar lembrete</span>
+                      <div
+                        style={{
+                          position: 'relative',
+                          width: 56,
+                          height: 28,
+                          borderRadius: 20,
+                          background: slot.reminder ? '#4ade80' : 'rgba(255,255,255,0.12)',
+                          transition: 'all 0.2s ease',
+                          boxShadow: slot.reminder
+                            ? '0 10px 20px rgba(74, 222, 128, 0.35)'
+                            : 'inset 0 1px 4px rgba(0,0,0,0.2)',
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={!!slot.reminder}
+                          onChange={(e) => handleScheduleChange(slot.day, 'reminder', e.target.checked)}
+                          style={{
+                            position: 'absolute',
+                            inset: 0,
+                            opacity: 0,
+                            cursor: 'pointer',
+                          }}
+                        />
+                        <span
+                          style={{
+                            position: 'absolute',
+                            top: 3,
+                            left: slot.reminder ? 30 : 4,
+                            width: 22,
+                            height: 22,
+                            borderRadius: '50%',
+                            background: '#fff',
+                            boxShadow: '0 6px 12px rgba(0,0,0,0.25)',
+                            transition: 'all 0.2s ease',
+                          }}
+                        ></span>
+                      </div>
+                    </label>
                   </div>
                 </div>
               ))}
             </div>
+            <div className="row" style={{ justifyContent: 'flex-end', marginTop: 12 }}>
+              <button
+                className="primary"
+                onClick={handleSaveSchedule}
+                disabled={savingSchedule || !hasWorkouts}
+              >
+                {savingSchedule ? 'Salvando...' : 'Salvar semana de treino'}
+              </button>
+            </div>
+            {!hasWorkouts && (
+              <div className="muted" style={{ marginTop: 8, fontSize: 13 }}>
+                Cadastre ao menos um treino para montar a semana.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'history' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div className="row" style={{ gap: 8 }}>
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <label>De</label>
+              <input
+                type="date"
+                value={historyRange.from}
+                onChange={(e) => setHistoryRange((prev) => ({ ...prev, from: e.target.value }))}
+              />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <label>Até</label>
+              <input
+                type="date"
+                value={historyRange.to}
+                onChange={(e) => setHistoryRange((prev) => ({ ...prev, to: e.target.value }))}
+              />
+            </div>
+          </div>
+
+          {!sessions.length && <div className="muted">Nenhum treino registrado no período.</div>}
+          {sessions.length > 0 && (
+            <div className="table">
+              {sessions.map((session) => (
+                <details key={session.id} className="table-row" open>
+                  <summary style={{ cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <div className="row" style={{ justifyContent: 'space-between' }}>
+                      <div style={{ fontWeight: 600 }}>{session.name}</div>
+                      <span className="muted" style={{ fontSize: 13 }}>{session.date}</span>
+                    </div>
+                    <div className="muted" style={{ fontSize: 13 }}>
+                      {(session.muscleGroups || []).map((g) => muscleMap[g]?.label || g).join(', ')}
+                    </div>
+                    <div className="muted" style={{ fontSize: 12 }}>
+                      {(session.exercises || []).map(formatExerciseResume).join('; ')}
+                    </div>
+                  </summary>
+                  <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    {(session.exercises || []).map((ex) => (
+                      <div
+                        key={ex.id}
+                        style={{
+                          border: '1px solid rgba(255,255,255,0.08)',
+                          padding: 12,
+                          borderRadius: 10,
+                          background: '#0f131c',
+                        }}
+                      >
+                        <div className="row" style={{ justifyContent: 'space-between' }}>
+                          <strong>{ex.name}</strong>
+                          <span className="muted" style={{ fontSize: 12 }}>
+                            {muscleMap[ex.muscleGroupId]?.label || ex.muscleGroupId}
+                          </span>
+                        </div>
+                        <div className="muted" style={{ fontSize: 13 }}>
+                          Séries: {ex.sets} · Repetições: {ex.reps} · Peso: {ex.weight || '--'}kg · Descanso: {ex.restSeconds}s
+                        </div>
+                        {ex.notes && (
+                          <div style={{ marginTop: 6, fontSize: 13 }}>
+                            <strong>Anotações:</strong> {ex.notes}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </details>
+              ))}
+            </div>
           )}
         </div>
-      </div>
+      )}
 
-      <div className="sep" style={{ margin: '18px 0' }}></div>
-
-      {/* SEMANA DE TREINO */}
-      <div>
-        <h4 className="title" style={{ marginBottom: 12 }}>Semana de Treino</h4>
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-            gap: 16,
-          }}
-        >
-          {schedule.map((slot) => (
-            <div
-              key={slot.day}
-              style={{
-                borderRadius: 12,
-                background: '#131722',
-                padding: 16,
-                boxShadow: '0 12px 30px rgba(0, 0, 0, 0.15)',
-                border: '1px solid rgba(255,255,255,0.08)',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 12,
-              }}
-            >
-              <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600 }}>
-                  <span
-                    style={{
-                      display: 'inline-flex',
-                      width: 32,
-                      height: 32,
-                      borderRadius: 8,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      background: 'rgba(255, 255, 255, 0.06)',
-                    }}
-                  >
-                    📅
-                  </span>
-                  {slot.day.toUpperCase()}
+      {activeTab === 'progress' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div className="muted" style={{ fontSize: 14 }}>
+            Total de treinos no mês: <strong>{progress.totalSessions || 0}</strong>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {Object.entries(progress.byMuscleGroup || {}).map(([muscle, count]) => (
+              <div key={muscle}>
+                <div className="row" style={{ justifyContent: 'space-between', fontSize: 13 }}>
+                  <span>{muscleMap[muscle]?.label || muscle}</span>
+                  <span className="muted">{count} treino(s)</span>
                 </div>
-                {slot.workout_id && (
-                  <span
-                    style={{
-                      padding: '4px 10px',
-                      borderRadius: 12,
-                      background: 'rgba(80, 190, 120, 0.15)',
-                      color: '#50be78',
-                      fontSize: 12,
-                      fontWeight: 600,
-                    }}
-                  >
-                    Treino ativo
-                  </span>
-                )}
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <label style={{ fontSize: 13, color: '#9ba4b5' }}>Treino</label>
-                <select
-                  value={slot.workout_id}
-                  onChange={(e) => handleScheduleChange(slot.day, 'workout_id', e.target.value)}
-                  style={{
-                    background: '#0f131c',
-                    border: '1px solid rgba(255,255,255,0.08)',
-                    color: '#fff',
-                    borderRadius: 10,
-                    padding: '10px 12px',
-                  }}
-                >
-                  <option value="">Selecione um treino</option>
-                  {workouts.map((item) => (
-                    <option key={item.id || item.name} value={item.id}>
-                      {item.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <label style={{ fontSize: 13, color: '#9ba4b5' }}>Horário</label>
                 <div
                   style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 8,
-                    background: '#0f131c',
-                    border: '1px solid rgba(255,255,255,0.08)',
+                    height: 10,
+                    background: 'rgba(255,255,255,0.08)',
                     borderRadius: 10,
-                    padding: '8px 12px',
+                    overflow: 'hidden',
                   }}
                 >
-                  <span role="img" aria-label="Relógio">
-                    🕒
-                  </span>
-                  <input
-                    type="time"
-                    value={slot.time}
-                    onChange={(e) => handleScheduleChange(slot.day, 'time', e.target.value)}
-                    style={{
-                      flex: 1,
-                      border: 'none',
-                      background: 'transparent',
-                      color: '#fff',
-                      outline: 'none',
-                    }}
-                  />
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <label style={{ fontSize: 13, color: '#9ba4b5' }}>Lembrete</label>
-                <label
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    background: '#0f131c',
-                    borderRadius: 12,
-                    padding: '10px 12px',
-                    border: '1px solid rgba(255,255,255,0.08)',
-                  }}
-                >
-                  <span style={{ color: '#d3d8e6' }}>Ativar lembrete</span>
                   <div
                     style={{
-                      position: 'relative',
-                      width: 56,
-                      height: 28,
-                      borderRadius: 20,
-                      background: slot.reminder ? '#4ade80' : 'rgba(255,255,255,0.12)',
-                      transition: 'all 0.2s ease',
-                      boxShadow: slot.reminder
-                        ? '0 10px 20px rgba(74, 222, 128, 0.35)'
-                        : 'inset 0 1px 4px rgba(0,0,0,0.2)',
+                      width: `${Math.min((count / Math.max(progress.totalSessions, 1)) * 100, 100)}%`,
+                      height: '100%',
+                      background: '#50be78',
                     }}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={!!slot.reminder}
-                      onChange={(e) => handleScheduleChange(slot.day, 'reminder', e.target.checked)}
-                      style={{
-                        position: 'absolute',
-                        inset: 0,
-                        opacity: 0,
-                        cursor: 'pointer',
-                      }}
-                    />
-                    <span
-                      style={{
-                        position: 'absolute',
-                        top: 3,
-                        left: slot.reminder ? 30 : 4,
-                        width: 22,
-                        height: 22,
-                        borderRadius: '50%',
-                        background: '#fff',
-                        boxShadow: '0 6px 12px rgba(0,0,0,0.25)',
-                        transition: 'all 0.2s ease',
-                      }}
-                    ></span>
-                  </div>
-                </label>
+                  ></div>
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
-        <div className="row" style={{ justifyContent: 'flex-end', marginTop: 12 }}>
-          <button
-            className="primary"
-            onClick={handleSaveSchedule}
-            disabled={savingSchedule || !hasWorkouts}
-          >
-            {savingSchedule ? 'Salvando...' : 'Salvar semana de treino'}
-          </button>
-        </div>
-        {!hasWorkouts && (
-          <div className="muted" style={{ marginTop: 8, fontSize: 13 }}>
-            Cadastre ao menos um treino para montar a semana.
+            ))}
+            {Object.keys(progress.byMuscleGroup || {}).length === 0 && (
+              <div className="muted">Nenhum progresso registrado ainda.</div>
+            )}
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
-      {/* MODAL VER TREINO */}
+      {/* MODAL VER TREINO + EXERCÍCIOS */}
       {showWorkoutModal && selectedWorkout && (
         <div
           style={{
@@ -666,9 +1026,11 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', pushToast }) => 
               background: '#0f131c',
               borderRadius: 16,
               padding: 24,
-              width: 'min(540px, 90vw)',
+              width: 'min(720px, 90vw)',
               boxShadow: '0 16px 40px rgba(0,0,0,0.4)',
               border: '1px solid rgba(255,255,255,0.08)',
+              maxHeight: '90vh',
+              overflow: 'auto',
             }}
           >
             <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
@@ -678,6 +1040,7 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', pushToast }) => 
                 onClick={() => {
                   setShowWorkoutModal(false);
                   setSelectedWorkout(null);
+                  setExerciseModalGroup(null);
                 }}
               >
                 Fechar
@@ -691,7 +1054,11 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', pushToast }) => 
                 <div className="muted" style={{ fontSize: 13 }}>
                   Nome do treino
                 </div>
-                <div style={{ fontSize: 16, fontWeight: 600 }}>{selectedWorkout.name}</div>
+                <input
+                  value={workoutForm.name}
+                  onChange={(e) => setWorkoutForm((prev) => ({ ...prev, name: e.target.value }))}
+                  placeholder="Nome do treino"
+                />
               </div>
 
               <div>
@@ -708,7 +1075,12 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', pushToast }) => 
                 {selectedMuscleDetails.length > 0 && (
                   <div className="muscle-grid">
                     {selectedMuscleDetails.map((muscle) => (
-                      <div key={muscle.value} className="muscle-card active">
+                      <button
+                        type="button"
+                        key={muscle.value}
+                        className="muscle-card active"
+                        onClick={() => setExerciseModalGroup(muscle.value)}
+                      >
                         <div className="muscle-image-wrapper">
                           <img
                             src={muscle.image}
@@ -717,44 +1089,159 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', pushToast }) => 
                           />
                         </div>
                         <span className="muscle-label">{muscle.label}</span>
-                      </div>
+                      </button>
                     ))}
                   </div>
                 )}
               </div>
 
               <div>
-                <div className="muted" style={{ fontSize: 13, marginBottom: 8 }}>
-                  Esportes / atividades
+                <div className="row" style={{ justifyContent: 'space-between', marginBottom: 8 }}>
+                  <div className="muted" style={{ fontSize: 13 }}>
+                    Exercícios ({filteredExercises.length})
+                  </div>
+                  <button
+                    className="ghost small"
+                    onClick={() => handleAddExercise(exerciseModalGroup || workoutForm.muscleGroups[0] || 'peito')}
+                  >
+                    Adicionar exercício
+                  </button>
                 </div>
 
-                {selectedSportsDetails.length === 0 && (
-                  <p className="muted" style={{ fontSize: 13 }}>
-                    Nenhum esporte selecionado.
-                  </p>
+                {filteredExercises.length === 0 && (
+                  <div className="muted" style={{ fontSize: 13 }}>
+                    Selecione um grupo muscular acima para adicionar exercícios.
+                  </div>
                 )}
 
-                {selectedSportsDetails.length > 0 && (
-                  <div className="muscle-grid">
-                    {selectedSportsDetails.map((sport) => (
-                      <div key={sport.value} className="muscle-card active">
-                        <div className="muscle-image-wrapper">
-                          <img
-                            src={sport.image}
-                            alt={sport.label}
-                            className="muscle-image"
-                          />
+                {filteredExercises.length > 0 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    {filteredExercises.map((exercise) => (
+                      <div
+                        key={exercise.id}
+                        style={{
+                          border: '1px solid rgba(255,255,255,0.08)',
+                          padding: 12,
+                          borderRadius: 10,
+                          background: '#0f131c',
+                          display: 'grid',
+                          gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+                          gap: 8,
+                        }}
+                      >
+                        <input
+                          placeholder="Nome do exercício"
+                          value={exercise.name}
+                          onChange={(e) => handleExerciseChange(exercise.id, 'name', e.target.value)}
+                        />
+                        <input
+                          type="number"
+                          placeholder="Séries"
+                          value={exercise.sets}
+                          onChange={(e) => handleExerciseChange(exercise.id, 'sets', Number(e.target.value))}
+                        />
+                        <input
+                          type="number"
+                          placeholder="Repetições"
+                          value={exercise.reps}
+                          onChange={(e) => handleExerciseChange(exercise.id, 'reps', Number(e.target.value))}
+                        />
+                        <input
+                          type="number"
+                          placeholder="Peso (kg)"
+                          value={exercise.weight ?? ''}
+                          onChange={(e) => handleExerciseChange(exercise.id, 'weight', e.target.value ? Number(e.target.value) : null)}
+                        />
+                        <input
+                          type="number"
+                          placeholder="Descanso (s)"
+                          value={exercise.restSeconds}
+                          onChange={(e) => handleExerciseChange(exercise.id, 'restSeconds', Number(e.target.value))}
+                        />
+                        <textarea
+                          placeholder="Notas"
+                          value={exercise.notes || ''}
+                          onChange={(e) => handleExerciseChange(exercise.id, 'notes', e.target.value)}
+                          rows={2}
+                          style={{ gridColumn: '1 / -1' }}
+                        ></textarea>
+                        <div className="row" style={{ justifyContent: 'space-between', gridColumn: '1 / -1' }}>
+                          <button className="ghost small" onClick={() => handleRemoveExercise(exercise.id)}>
+                            Remover
+                          </button>
+                          {exerciseHelp[exercise.name] && (
+                            <details>
+                              <summary className="ghost small" style={{ cursor: 'pointer' }}>
+                                Ver execução
+                              </summary>
+                              <div style={{ marginTop: 8 }}>
+                                <div style={{ aspectRatio: '16/9', width: '100%' }}>
+                                  <iframe
+                                    src={exerciseHelp[exercise.name].videoUrl}
+                                    title={exercise.name}
+                                    style={{ width: '100%', height: '100%', border: 'none', borderRadius: 8 }}
+                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                    allowFullScreen
+                                  ></iframe>
+                                </div>
+                                <div className="muted" style={{ marginTop: 6, fontSize: 13 }}>
+                                  {exerciseHelp[exercise.name].tips}
+                                </div>
+                              </div>
+                            </details>
+                          )}
                         </div>
-                        <span className="muscle-label">{sport.label}</span>
                       </div>
                     ))}
                   </div>
                 )}
               </div>
 
+              <div
+                style={{
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  borderRadius: 12,
+                  padding: 12,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 8,
+                }}
+              >
+                <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <div style={{ fontWeight: 600 }}>Timer de descanso</div>
+                    <div className="muted" style={{ fontSize: 12 }}>
+                      Escolha um tempo e inicie para contar o descanso do exercício.
+                    </div>
+                  </div>
+                  <div className="row" style={{ gap: 8 }}>
+                    {[30, 45, 60, 90].map((sec) => (
+                      <button
+                        key={sec}
+                        className={restDuration === sec ? 'primary small' : 'ghost small'}
+                        onClick={() => setRestDuration(sec)}
+                      >
+                        {sec}s
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ fontSize: 28, fontWeight: 700 }}>
+                    {restCountdown || restDuration}s
+                  </div>
+                  <button className="primary" onClick={startRestTimer}>
+                    Iniciar descanso
+                  </button>
+                </div>
+                {restFinished && (
+                  <div style={{ color: '#50be78', fontWeight: 600 }}>Descanso finalizado!</div>
+                )}
+              </div>
+
               <div className="row" style={{ justifyContent: 'flex-end' }}>
                 <button
-                  className="ghost"
+                  className="primary"
                   onClick={() => {
                     setShowWorkoutModal(false);
                     setSelectedWorkout(null);
