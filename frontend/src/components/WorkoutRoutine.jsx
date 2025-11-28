@@ -1,22 +1,15 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import chestImg from '../assets/muscles/Peito.png';
-import backImg from '../assets/muscles/Costas.png';
-import shouldersImg from '../assets/muscles/Ombros.png';
-import bicepsImg from '../assets/muscles/Biceps.png';
-import tricepsImg from '../assets/muscles/Triceps.png';
-import absImg from '../assets/muscles/Abdomen.png';
-import legsImg from '../assets/muscles/Pernas.png';
-import glutesImg from '../assets/muscles/Gluteos.png';
+import musclePlaceholder from '../assets/muscles/fototeste.png';
 
 const MUSCLE_GROUPS = [
-  { value: 'chest', label: 'Peito', image: chestImg },
-  { value: 'back', label: 'Costas', image: backImg },
-  { value: 'shoulders', label: 'Ombros', image: shouldersImg },
-  { value: 'biceps', label: 'Bíceps', image: bicepsImg },
-  { value: 'triceps', label: 'Tríceps', image: tricepsImg },
-  { value: 'abs', label: 'Abdômen', image: absImg },
-  { value: 'legs', label: 'Pernas', image: legsImg },
-  { value: 'glutes', label: 'Glúteos', image: glutesImg }
+  { value: 'chest', label: 'Peito', image: musclePlaceholder },
+  { value: 'back', label: 'Costas', image: musclePlaceholder },
+  { value: 'shoulders', label: 'Ombros', image: musclePlaceholder },
+  { value: 'biceps', label: 'Bíceps', image: musclePlaceholder },
+  { value: 'triceps', label: 'Tríceps', image: musclePlaceholder },
+  { value: 'abs', label: 'Abdômen', image: musclePlaceholder },
+  { value: 'legs', label: 'Pernas', image: musclePlaceholder },
+  { value: 'glutes', label: 'Glúteos', image: musclePlaceholder }
 ];
 
 const WEEK_DAYS = [
@@ -43,6 +36,20 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', pushToast }) => 
   const [loading, setLoading] = useState(false);
   const [savingSchedule, setSavingSchedule] = useState(false);
   const [userId, setUserId] = useState('');
+  const [selectedWorkout, setSelectedWorkout] = useState(null);
+  const [showWorkoutModal, setShowWorkoutModal] = useState(false);
+
+  const muscleMap = useMemo(
+    () =>
+      MUSCLE_GROUPS.reduce(
+        (acc, group) => ({
+          ...acc,
+          [group.value]: group,
+        }),
+        {}
+      ),
+    []
+  );
 
   const supabase = useMemo(() => {
     const { supabaseUrl, supabaseAnonKey, authSchema } = window.APP_CONFIG || {};
@@ -297,15 +304,27 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', pushToast }) => 
               <div className="table-head">
                 <div>Nome</div>
                 <div>Grupos</div>
-                <div style={{ width: 80 }}>Ações</div>
+                <div style={{ width: 150 }}>Ações</div>
               </div>
               {workouts.map((item) => (
                 <div className="table-row" key={item.id || item.name}>
                   <div>{item.name}</div>
                   <div className="muted" style={{ fontSize: 13 }}>
-                    {(item.muscleGroups || []).join(', ')}
+                    {(item.muscleGroups || [])
+                      .map((group) => muscleMap[group]?.label || group)
+                      .join(', ')}
                   </div>
-                  <div>
+                  <div className="row" style={{ gap: 8, justifyContent: 'flex-end' }}>
+                    <button
+                      className="ghost small"
+                      onClick={() => {
+                        setSelectedWorkout(item);
+                        setShowWorkoutModal(true);
+                      }}
+                      disabled={loading}
+                    >
+                      Ver treino
+                    </button>
                     <button
                       className="ghost small"
                       onClick={() => handleDeleteWorkout(item.id)}
@@ -325,20 +344,72 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', pushToast }) => 
 
       <div>
         <h4 className="title" style={{ marginBottom: 12 }}>Semana de Treino</h4>
-        <div className="table">
-          <div className="table-head">
-            <div style={{ minWidth: 120 }}>Dia</div>
-            <div style={{ minWidth: 200 }}>Treino</div>
-            <div style={{ minWidth: 140 }}>Horário</div>
-            <div style={{ width: 140 }}>Lembrete</div>
-          </div>
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+            gap: 16,
+          }}
+        >
           {schedule.map((slot) => (
-            <div className="table-row" key={slot.day}>
-              <div>{slot.day}</div>
-              <div>
+            <div
+              key={slot.day}
+              style={{
+                borderRadius: 12,
+                background: '#131722',
+                padding: 16,
+                boxShadow: '0 12px 30px rgba(0, 0, 0, 0.15)',
+                border: '1px solid rgba(255,255,255,0.08)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 12,
+              }}
+            >
+              <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600 }}>
+                  <span
+                    style={{
+                      display: 'inline-flex',
+                      width: 32,
+                      height: 32,
+                      borderRadius: 8,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      background: 'rgba(255, 255, 255, 0.06)',
+                    }}
+                  >
+                    📅
+                  </span>
+                  {slot.day.toUpperCase()}
+                </div>
+                {slot.workout_id && (
+                  <span
+                    style={{
+                      padding: '4px 10px',
+                      borderRadius: 12,
+                      background: 'rgba(80, 190, 120, 0.15)',
+                      color: '#50be78',
+                      fontSize: 12,
+                      fontWeight: 600,
+                    }}
+                  >
+                    Treino ativo
+                  </span>
+                )}
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <label style={{ fontSize: 13, color: '#9ba4b5' }}>Treino</label>
                 <select
                   value={slot.workout_id}
                   onChange={(e) => handleScheduleChange(slot.day, 'workout_id', e.target.value)}
+                  style={{
+                    background: '#0f131c',
+                    border: '1px solid rgba(255,255,255,0.08)',
+                    color: '#fff',
+                    borderRadius: 10,
+                    padding: '10px 12px',
+                  }}
                 >
                   <option value="">Selecione um treino</option>
                   {workouts.map((item) => (
@@ -348,21 +419,90 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', pushToast }) => 
                   ))}
                 </select>
               </div>
-              <div>
-                <input
-                  type="time"
-                  value={slot.time}
-                  onChange={(e) => handleScheduleChange(slot.day, 'time', e.target.value)}
-                />
-              </div>
-              <div>
-                <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <label style={{ fontSize: 13, color: '#9ba4b5' }}>Horário</label>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    background: '#0f131c',
+                    border: '1px solid rgba(255,255,255,0.08)',
+                    borderRadius: 10,
+                    padding: '8px 12px',
+                  }}
+                >
+                  <span role="img" aria-label="Relógio">
+                    🕒
+                  </span>
                   <input
-                    type="checkbox"
-                    checked={!!slot.reminder}
-                    onChange={(e) => handleScheduleChange(slot.day, 'reminder', e.target.checked)}
+                    type="time"
+                    value={slot.time}
+                    onChange={(e) => handleScheduleChange(slot.day, 'time', e.target.value)}
+                    style={{
+                      flex: 1,
+                      border: 'none',
+                      background: 'transparent',
+                      color: '#fff',
+                      outline: 'none',
+                    }}
                   />
-                  Ativar lembrete
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <label style={{ fontSize: 13, color: '#9ba4b5' }}>Lembrete</label>
+                <label
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    background: '#0f131c',
+                    borderRadius: 12,
+                    padding: '10px 12px',
+                    border: '1px solid rgba(255,255,255,0.08)',
+                  }}
+                >
+                  <span style={{ color: '#d3d8e6' }}>Ativar lembrete</span>
+                  <div
+                    style={{
+                      position: 'relative',
+                      width: 56,
+                      height: 28,
+                      borderRadius: 20,
+                      background: slot.reminder ? '#4ade80' : 'rgba(255,255,255,0.12)',
+                      transition: 'all 0.2s ease',
+                      boxShadow: slot.reminder
+                        ? '0 10px 20px rgba(74, 222, 128, 0.35)'
+                        : 'inset 0 1px 4px rgba(0,0,0,0.2)',
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={!!slot.reminder}
+                      onChange={(e) => handleScheduleChange(slot.day, 'reminder', e.target.checked)}
+                      style={{
+                        position: 'absolute',
+                        inset: 0,
+                        opacity: 0,
+                        cursor: 'pointer',
+                      }}
+                    />
+                    <span
+                      style={{
+                        position: 'absolute',
+                        top: 3,
+                        left: slot.reminder ? 30 : 4,
+                        width: 22,
+                        height: 22,
+                        borderRadius: '50%',
+                        background: '#fff',
+                        boxShadow: '0 6px 12px rgba(0,0,0,0.25)',
+                        transition: 'all 0.2s ease',
+                      }}
+                    ></span>
+                  </div>
                 </label>
               </div>
             </div>
@@ -383,6 +523,112 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', pushToast }) => 
           </div>
         )}
       </div>
+
+      {showWorkoutModal && selectedWorkout && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0, 0, 0, 0.6)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 20,
+          }}
+        >
+          <div
+            style={{
+              background: '#0f131c',
+              borderRadius: 16,
+              padding: 24,
+              width: 'min(480px, 90vw)',
+              boxShadow: '0 16px 40px rgba(0,0,0,0.4)',
+              border: '1px solid rgba(255,255,255,0.08)',
+            }}
+          >
+            <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+              <h4 style={{ margin: 0 }}>Detalhes do treino</h4>
+              <button
+                className="ghost"
+                onClick={() => {
+                  setShowWorkoutModal(false);
+                  setSelectedWorkout(null);
+                }}
+              >
+                Fechar
+              </button>
+            </div>
+
+            <div className="sep" style={{ margin: '12px 0' }}></div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div>
+                <div className="muted" style={{ fontSize: 13 }}>
+                  Nome do treino
+                </div>
+                <div style={{ fontSize: 16, fontWeight: 600 }}>{selectedWorkout.name}</div>
+              </div>
+
+              <div>
+                <div className="muted" style={{ fontSize: 13, marginBottom: 8 }}>
+                  Grupos musculares
+                </div>
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
+                    gap: 10,
+                  }}
+                >
+                  {(selectedWorkout.muscleGroups || []).map((group) => {
+                    const info = muscleMap[group];
+                    return (
+                      <div
+                        key={group}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 8,
+                          padding: '8px 10px',
+                          background: 'rgba(255,255,255,0.04)',
+                          borderRadius: 12,
+                          border: '1px solid rgba(255,255,255,0.05)',
+                        }}
+                      >
+                        {info?.image && (
+                          <div
+                            style={{
+                              width: 32,
+                              height: 32,
+                              borderRadius: 10,
+                              overflow: 'hidden',
+                              background: '#0a0d14',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                            }}
+                          >
+                            <img
+                              src={info.image}
+                              alt={info.label}
+                              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                            />
+                          </div>
+                        )}
+                        <span style={{ fontSize: 13 }}>{info?.label || group}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="muted" style={{ fontSize: 12 }}>
+                Em breve será possível adicionar exercícios específicos dentro de cada treino.
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 };
