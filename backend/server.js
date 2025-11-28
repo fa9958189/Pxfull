@@ -109,6 +109,23 @@ const normalizeMuscleGroups = (muscleGroups) => {
   return "";
 };
 
+const normalizeSportsArray = (sports) => {
+  if (Array.isArray(sports)) return sports;
+  if (typeof sports === "string") {
+    return sports
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+  }
+  return [];
+};
+
+const normalizeSportsString = (sports) => {
+  if (Array.isArray(sports)) return sports.join(",");
+  if (typeof sports === "string") return sports;
+  return "";
+};
+
 // GET /workout-routines
 app.get("/workout-routines", async (req, res) => {
   try {
@@ -119,7 +136,7 @@ app.get("/workout-routines", async (req, res) => {
 
     const { data, error } = await supabase
       .from("workout_routines")
-      .select("id, user_id, name, muscle_groups, created_at")
+      .select("id, user_id, name, muscle_groups, sports, sports_list, created_at")
       .eq("user_id", userId)
       .order("created_at", { ascending: false });
 
@@ -128,7 +145,12 @@ app.get("/workout-routines", async (req, res) => {
       return res.status(400).json({ error: error.message });
     }
 
-    return res.json(data || []);
+    const normalized = (data || []).map((item) => {
+      const sports = normalizeSportsArray(item.sports ?? item.sports_list);
+      return { ...item, sports };
+    });
+
+    return res.json(normalized);
   } catch (err) {
     console.error("Erro inesperado em GET /workout-routines:", err);
     return res.status(500).json({ error: "Erro interno no servidor" });
@@ -139,7 +161,7 @@ app.get("/workout-routines", async (req, res) => {
 app.post("/workout-routines", async (req, res) => {
   try {
     const userId = getUserIdFromRequest(req);
-    const { name, muscleGroups } = req.body || {};
+    const { name, muscleGroups, sports } = req.body || {};
 
     if (!userId || !name) {
       return res.status(400).json({ error: "user_id e name são obrigatórios." });
@@ -152,9 +174,20 @@ app.post("/workout-routines", async (req, res) => {
         .json({ error: "muscleGroups é obrigatório (array ou string)." });
     }
 
+    const sportsArray = normalizeSportsArray(sports);
+    const sports_list = normalizeSportsString(sportsArray);
+
+    const insertPayload = {
+      user_id: userId,
+      name,
+      muscle_groups,
+      sports: sportsArray,
+      sports_list,
+    };
+
     const { data, error } = await supabase
       .from("workout_routines")
-      .insert({ user_id: userId, name, muscle_groups })
+      .insert(insertPayload)
       .select()
       .single();
 
@@ -163,7 +196,7 @@ app.post("/workout-routines", async (req, res) => {
       return res.status(400).json({ error: error.message });
     }
 
-    return res.json(data);
+    return res.json({ ...data, sports: normalizeSportsArray(data?.sports ?? data?.sports_list) });
   } catch (err) {
     console.error("Erro inesperado em POST /workout-routines:", err);
     return res.status(500).json({ error: "Erro interno no servidor" });
