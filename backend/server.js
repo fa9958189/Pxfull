@@ -2,6 +2,15 @@ import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import { supabase } from "./supabase.js";
+import {
+  createWorkoutSession,
+  listWorkoutSessions,
+  listWorkoutTemplates,
+  deleteWorkoutTemplate,
+  saveWorkoutReminder,
+  summarizeProgress,
+  upsertWorkoutTemplate,
+} from "./workoutsStorage.js";
 
 const app = express();
 app.use(cors());
@@ -345,6 +354,168 @@ app.post("/workout-schedule", async (req, res) => {
   } catch (err) {
     console.error("Erro inesperado em POST /workout-schedule:", err);
     return res.status(500).json({ error: "Erro interno no servidor" });
+  }
+});
+
+// ==== Rotas de Rotina de Treino / Histórico ====
+// Todas agrupadas em /api/workouts para não conflitar com fluxos já existentes.
+app.post("/api/workouts/templates", async (req, res) => {
+  try {
+    const { userId, name, muscleGroups = [], exercises = [], muscle_groups } = req.body || {};
+    const normalizedMuscleGroups = Array.isArray(muscleGroups)
+      ? muscleGroups
+      : typeof muscle_groups === "string"
+      ? muscle_groups.split(",").map((item) => item.trim()).filter(Boolean)
+      : [];
+
+    if (!userId || !name || !normalizedMuscleGroups.length) {
+      return res.status(400).json({
+        error: "userId, name e muscleGroups são obrigatórios para salvar o template.",
+      });
+    }
+
+    const templatePayload = {
+      userId,
+      name,
+      muscleGroups: normalizedMuscleGroups,
+      exercises: Array.isArray(exercises) ? exercises : [],
+    };
+
+    const saved = await upsertWorkoutTemplate(templatePayload);
+    return res.json(saved);
+  } catch (err) {
+    console.error("Erro ao criar template de treino", err);
+    return res.status(500).json({ error: "Erro interno ao salvar template" });
+  }
+});
+
+app.put("/api/workouts/templates/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { userId, name, muscleGroups = [], exercises = [], muscle_groups } = req.body || {};
+    const normalizedMuscleGroups = Array.isArray(muscleGroups)
+      ? muscleGroups
+      : typeof muscle_groups === "string"
+      ? muscle_groups.split(",").map((item) => item.trim()).filter(Boolean)
+      : [];
+
+    if (!id || !userId || !name || !normalizedMuscleGroups.length) {
+      return res.status(400).json({
+        error: "id, userId, name e muscleGroups são obrigatórios para atualizar o template.",
+      });
+    }
+
+    const templatePayload = {
+      id,
+      userId,
+      name,
+      muscleGroups: normalizedMuscleGroups,
+      exercises: Array.isArray(exercises) ? exercises : [],
+    };
+
+    const saved = await upsertWorkoutTemplate(templatePayload);
+    return res.json(saved);
+  } catch (err) {
+    console.error("Erro ao atualizar template de treino", err);
+    return res.status(500).json({ error: "Erro interno ao atualizar template" });
+  }
+});
+
+  app.get("/api/workouts/templates", async (req, res) => {
+  try {
+    const userId = getUserIdFromRequest(req) || req.query.userId;
+    if (!userId) {
+      return res.status(400).json({ error: "userId é obrigatório" });
+    }
+
+    const templates = await listWorkoutTemplates(userId);
+    return res.json(templates);
+  } catch (err) {
+    console.error("Erro ao listar templates", err);
+    return res.status(500).json({ error: "Erro interno ao listar templates" });
+  }
+});
+
+app.delete("/api/workouts/templates/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = getUserIdFromRequest(req) || req.body?.userId;
+
+    if (!id || !userId) {
+      return res.status(400).json({ error: "id e userId são obrigatórios" });
+    }
+
+    await deleteWorkoutTemplate(id, userId);
+    return res.json({ success: true });
+  } catch (err) {
+    console.error("Erro ao excluir template", err);
+    return res.status(500).json({ error: "Erro interno ao excluir template" });
+  }
+});
+
+app.post("/api/workouts/sessions", async (req, res) => {
+  try {
+    const session = req.body || {};
+    if (!session.userId || !session.date || !session.name) {
+      return res.status(400).json({ error: "userId, date e name são obrigatórios." });
+    }
+
+    const saved = await createWorkoutSession(session);
+    return res.json(saved);
+  } catch (err) {
+    console.error("Erro ao registrar sessão", err);
+    return res.status(500).json({ error: "Erro interno ao salvar sessão" });
+  }
+});
+
+app.get("/api/workouts/sessions", async (req, res) => {
+  try {
+    const userId = getUserIdFromRequest(req) || req.query.userId;
+    const { from, to } = req.query || {};
+
+    if (!userId) {
+      return res.status(400).json({ error: "userId é obrigatório" });
+    }
+
+    const sessions = await listWorkoutSessions(userId, { from, to });
+    return res.json(sessions);
+  } catch (err) {
+    console.error("Erro ao listar sessões", err);
+    return res.status(500).json({ error: "Erro interno ao listar sessões" });
+  }
+});
+
+app.get("/api/workouts/progress", async (req, res) => {
+  try {
+    const userId = getUserIdFromRequest(req) || req.query.userId;
+    const { period = "month" } = req.query || {};
+
+    if (!userId) {
+      return res.status(400).json({ error: "userId é obrigatório" });
+    }
+
+    const summary = await summarizeProgress(userId, period);
+    return res.json(summary);
+  } catch (err) {
+    console.error("Erro ao gerar progresso", err);
+    return res.status(500).json({ error: "Erro interno ao gerar progresso" });
+  }
+});
+
+app.post("/api/workouts/reminders", async (req, res) => {
+  try {
+    const reminder = req.body || {};
+    if (!reminder.workoutName || !reminder.date) {
+      return res.status(400).json({ error: "workoutName e date são obrigatórios" });
+    }
+
+    // Apenas registrar por enquanto; integração real pode ser adicionada depois
+    console.log("Novo lembrete de treino", reminder);
+    const saved = await saveWorkoutReminder(reminder);
+    return res.json(saved);
+  } catch (err) {
+    console.error("Erro ao salvar lembrete de treino", err);
+    return res.status(500).json({ error: "Erro interno ao salvar lembrete" });
   }
 });
 
