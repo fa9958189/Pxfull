@@ -110,13 +110,38 @@ const normalizeMuscleGroups = (muscleGroups) => {
 };
 
 const normalizeSportsArray = (sports) => {
+  // Se já for array, só devolve
   if (Array.isArray(sports)) return sports;
+
   if (typeof sports === "string") {
-    return sports
+    const trimmed = sports.trim();
+
+    // Se for JSON tipo '["boxing","running"]', tenta fazer parse
+    if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (Array.isArray(parsed)) {
+          return parsed
+            .map((s) => String(s).trim())
+            .filter(Boolean);
+        }
+      } catch (e) {
+        // Se der erro, continua para o tratamento normal
+      }
+    }
+
+    // Caso seja string separada por vírgula: "boxing,running"
+    return trimmed
       .split(",")
-      .map((s) => s.trim())
+      .map((s) =>
+        String(s)
+          .trim()
+          .replace(/^\[|\]$/g, "")   // remove colchetes
+          .replace(/^"|"$/g, "")     // remove aspas
+      )
       .filter(Boolean);
   }
+
   return [];
 };
 
