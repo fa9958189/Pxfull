@@ -39,6 +39,20 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', pushToast }) => 
   const [selectedWorkout, setSelectedWorkout] = useState(null);
   const [showWorkoutModal, setShowWorkoutModal] = useState(false);
 
+  const normalizeWorkoutFromApi = (item) => {
+    const rawGroups =
+      Array.isArray(item.muscleGroups)
+        ? item.muscleGroups
+        : typeof item.muscle_groups === 'string'
+          ? item.muscle_groups.split(',').map((g) => g.trim()).filter(Boolean)
+          : [];
+
+    return {
+      ...item,
+      muscleGroups: rawGroups,
+    };
+  };
+
   const muscleMap = useMemo(
     () =>
       MUSCLE_GROUPS.reduce(
@@ -66,6 +80,15 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', pushToast }) => 
   }, []);
 
   const hasWorkouts = useMemo(() => workouts.length > 0, [workouts]);
+
+  // Detalhes dos músculos do treino selecionado (pra usar no modal)
+  const selectedMuscleDetails = useMemo(() => {
+    if (!selectedWorkout || !Array.isArray(selectedWorkout.muscleGroups)) return [];
+
+    return MUSCLE_GROUPS.filter((group) =>
+      selectedWorkout.muscleGroups.includes(group.value)
+    );
+  }, [selectedWorkout]);
 
   const notify = (message, variant = 'info') => {
     if (typeof pushToast === 'function') {
@@ -96,7 +119,9 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', pushToast }) => 
       }
       setLoading(true);
       const data = await fetchJson(`${apiBaseUrl}/workout-routines?user_id=${userId}`);
-      setWorkouts(Array.isArray(data) ? data : data?.items || []);
+      const raw = Array.isArray(data) ? data : data?.items || [];
+      const normalized = raw.map(normalizeWorkoutFromApi);
+      setWorkouts(normalized);
     } catch (err) {
       console.error('Erro ao carregar treinos', err);
       notify('Não foi possível carregar os treinos.');
@@ -159,7 +184,7 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', pushToast }) => 
       });
       setWorkoutForm({ name: '', muscleGroups: [] });
       if (saved && saved.id) {
-        setWorkouts((prev) => [saved, ...prev]);
+        setWorkouts((prev) => [normalizeWorkoutFromApi(saved), ...prev]);
       } else {
         await loadWorkouts();
       }
@@ -259,6 +284,7 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', pushToast }) => 
       <div className="sep"></div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+        {/* NOVO TREINO */}
         <div>
           <h4 className="title" style={{ marginBottom: 12 }}>Novo Treino</h4>
           <label>Nome do treino</label>
@@ -296,16 +322,12 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', pushToast }) => 
           </div>
         </div>
 
+        {/* TREINOS CADASTRADOS */}
         <div>
           <h4 className="title" style={{ marginBottom: 12 }}>Treinos cadastrados</h4>
           {!workouts.length && <div className="muted">Nenhum treino cadastrado.</div>}
           {workouts.length > 0 && (
             <div className="table">
-              <div className="table-head">
-                <div>Nome</div>
-                <div>Grupos</div>
-                <div style={{ width: 150 }}>Ações</div>
-              </div>
               {workouts.map((item) => (
                 <div className="table-row" key={item.id || item.name}>
                   <div>{item.name}</div>
@@ -342,6 +364,7 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', pushToast }) => 
 
       <div className="sep" style={{ margin: '18px 0' }}></div>
 
+      {/* SEMANA DE TREINO */}
       <div>
         <h4 className="title" style={{ marginBottom: 12 }}>Semana de Treino</h4>
         <div
@@ -524,6 +547,7 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', pushToast }) => 
         )}
       </div>
 
+      {/* MODAL VER TREINO */}
       {showWorkoutModal && selectedWorkout && (
         <div
           style={{
@@ -535,7 +559,7 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', pushToast }) => 
             justifyContent: 'center',
             zIndex: 20,
           }}
-          >
+        >
           <div
             style={{
               background: '#0f131c',
@@ -573,23 +597,29 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', pushToast }) => 
                 <div className="muted" style={{ fontSize: 13, marginBottom: 8 }}>
                   Grupos musculares
                 </div>
-                <div className="muscle-grid">
-                  {MUSCLE_GROUPS.filter((muscle) =>
-                    (selectedWorkout.muscleGroups || []).includes(muscle.value)
-                  ).map((muscle) => (
-                    <div key={muscle.value} className="muscle-card active">
-                      <div className="muscle-image-wrapper">
-                        <img src={muscle.image} alt={muscle.label} className="muscle-image" />
+
+                {selectedMuscleDetails.length === 0 && (
+                  <p className="muted" style={{ fontSize: 13 }}>
+                    Nenhum grupo muscular selecionado.
+                  </p>
+                )}
+
+                {selectedMuscleDetails.length > 0 && (
+                  <div className="muscle-grid">
+                    {selectedMuscleDetails.map((muscle) => (
+                      <div key={muscle.value} className="muscle-card active">
+                        <div className="muscle-image-wrapper">
+                          <img
+                            src={muscle.image}
+                            alt={muscle.label}
+                            className="muscle-image"
+                          />
+                        </div>
+                        <span className="muscle-label">{muscle.label}</span>
                       </div>
-                      <span className="muscle-label">{muscle.label}</span>
-                    </div>
-                  ))}
-                  {!(selectedWorkout.muscleGroups || []).length && (
-                    <div className="muted" style={{ gridColumn: '1/-1' }}>
-                      Nenhum grupo muscular selecionado.
-                    </div>
-                  )}
-                </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div className="row" style={{ justifyContent: 'flex-end' }}>
