@@ -1,26 +1,49 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import musclePlaceholder from '../assets/muscles/fototeste.png';
+import PeitoImg from '../assets/muscles/Peito.png';
+import CostasImg from '../assets/muscles/Costas.png';
+import OmbrosImg from '../assets/muscles/Ombros.png';
+import BicepsImg from '../assets/muscles/Biceps.png';
+import TricepsImg from '../assets/muscles/Triceps.png';
+import AbdomenImg from '../assets/muscles/Abdomen.png';
+import PernasImg from '../assets/muscles/Pernas.png';
+import GluteosImg from '../assets/muscles/Gluteos.png';
+import NatacaoImg from '../assets/muscles/Natacao.png';
+import VoleiImg from '../assets/muscles/Volei.png';
+import BoxeImg from '../assets/muscles/Boxe.png';
+import JiuJitsuImg from '../assets/muscles/Jiu-jitsu.png';
+import FutebolImg from '../assets/muscles/Futebol.png';
+import BeachTennisImg from '../assets/muscles/beach tennis.png';
 
-const MUSCLE_GROUPS = [
-  { value: 'chest', label: 'Peito', image: musclePlaceholder },
-  { value: 'back', label: 'Costas', image: musclePlaceholder },
-  { value: 'shoulders', label: 'Ombros', image: musclePlaceholder },
-  { value: 'biceps', label: 'Bíceps', image: musclePlaceholder },
-  { value: 'triceps', label: 'Tríceps', image: musclePlaceholder },
-  { value: 'abs', label: 'Abdômen', image: musclePlaceholder },
-  { value: 'legs', label: 'Pernas', image: musclePlaceholder },
-  { value: 'glutes', label: 'Glúteos', image: musclePlaceholder }
+const muscleGroups = [
+  { id: 'peito', name: 'Peito', image: PeitoImg },
+  { id: 'costas', name: 'Costas', image: CostasImg },
+  { id: 'ombros', name: 'Ombros', image: OmbrosImg },
+  { id: 'biceps', name: 'Bíceps', image: BicepsImg },
+  { id: 'triceps', name: 'Tríceps', image: TricepsImg },
+  { id: 'abdomen', name: 'Abdômen', image: AbdomenImg },
+  { id: 'pernas', name: 'Pernas', image: PernasImg },
+  { id: 'gluteos', name: 'Glúteos', image: GluteosImg },
+
+  // Esportes
+  { id: 'natacao', name: 'Natação', image: NatacaoImg },
+  { id: 'volei', name: 'Vôlei', image: VoleiImg },
+  { id: 'boxe', name: 'Boxe', image: BoxeImg },
+  { id: 'jiujitsu', name: 'Jiu-Jitsu', image: JiuJitsuImg },
+  { id: 'futebol', name: 'Futebol', image: FutebolImg },
+  { id: 'beachtennis', name: 'Beach Tennis', image: BeachTennisImg },
 ];
 
-const SPORTS = [
-  { value: 'swimming', label: 'Natação', image: musclePlaceholder },
-  { value: 'volleyball', label: 'Vôlei', image: musclePlaceholder },
-  { value: 'boxing', label: 'Boxe', image: musclePlaceholder },
-  { value: 'jiujitsu', label: 'Jiu-jítsu', image: musclePlaceholder },
-  { value: 'soccer', label: 'Futebol', image: musclePlaceholder },
-  { value: 'running', label: 'Corrida', image: musclePlaceholder },
-  { value: 'beachtennis', label: 'Beach Tennis', image: musclePlaceholder }
-];
+const MUSCLE_GROUPS = muscleGroups.slice(0, 8).map(({ id, name, image }) => ({
+  value: id,
+  label: name,
+  image
+}));
+
+const SPORTS = muscleGroups.slice(8).map(({ id, name, image }) => ({
+  value: id,
+  label: name,
+  image
+}));
 
 const WEEK_DAYS = [
   'Segunda',
