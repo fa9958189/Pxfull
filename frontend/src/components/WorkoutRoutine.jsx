@@ -258,8 +258,8 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', pushToast }) => 
 
       <div className="sep"></div>
 
-      <div className="row" style={{ gap: 20 }}>
-        <div style={{ flex: 1 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+        <div>
           <h4 className="title" style={{ marginBottom: 12 }}>Novo Treino</h4>
           <label>Nome do treino</label>
           <input
@@ -296,7 +296,7 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', pushToast }) => 
           </div>
         </div>
 
-        <div style={{ flex: 1 }}>
+        <div>
           <h4 className="title" style={{ marginBottom: 12 }}>Treinos cadastrados</h4>
           {!workouts.length && <div className="muted">Nenhum treino cadastrado.</div>}
           {workouts.length > 0 && (
@@ -535,13 +535,13 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', pushToast }) => 
             justifyContent: 'center',
             zIndex: 20,
           }}
-        >
+          >
           <div
             style={{
               background: '#0f131c',
               borderRadius: 16,
               padding: 24,
-              width: 'min(480px, 90vw)',
+              width: 'min(540px, 90vw)',
               boxShadow: '0 16px 40px rgba(0,0,0,0.4)',
               border: '1px solid rgba(255,255,255,0.08)',
             }}
@@ -561,7 +561,7 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', pushToast }) => 
 
             <div className="sep" style={{ margin: '12px 0' }}></div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               <div>
                 <div className="muted" style={{ fontSize: 13 }}>
                   Nome do treino
@@ -573,57 +573,35 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', pushToast }) => 
                 <div className="muted" style={{ fontSize: 13, marginBottom: 8 }}>
                   Grupos musculares
                 </div>
-                <div
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
-                    gap: 10,
-                  }}
-                >
-                  {(selectedWorkout.muscleGroups || []).map((group) => {
-                    const info = muscleMap[group];
-                    return (
-                      <div
-                        key={group}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 8,
-                          padding: '8px 10px',
-                          background: 'rgba(255,255,255,0.04)',
-                          borderRadius: 12,
-                          border: '1px solid rgba(255,255,255,0.05)',
-                        }}
-                      >
-                        {info?.image && (
-                          <div
-                            style={{
-                              width: 32,
-                              height: 32,
-                              borderRadius: 10,
-                              overflow: 'hidden',
-                              background: '#0a0d14',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                            }}
-                          >
-                            <img
-                              src={info.image}
-                              alt={info.label}
-                              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                            />
-                          </div>
-                        )}
-                        <span style={{ fontSize: 13 }}>{info?.label || group}</span>
+                <div className="muscle-grid">
+                  {MUSCLE_GROUPS.filter((muscle) =>
+                    (selectedWorkout.muscleGroups || []).includes(muscle.value)
+                  ).map((muscle) => (
+                    <div key={muscle.value} className="muscle-card active">
+                      <div className="muscle-image-wrapper">
+                        <img src={muscle.image} alt={muscle.label} className="muscle-image" />
                       </div>
-                    );
-                  })}
+                      <span className="muscle-label">{muscle.label}</span>
+                    </div>
+                  ))}
+                  {!(selectedWorkout.muscleGroups || []).length && (
+                    <div className="muted" style={{ gridColumn: '1/-1' }}>
+                      Nenhum grupo muscular selecionado.
+                    </div>
+                  )}
                 </div>
               </div>
 
-              <div className="muted" style={{ fontSize: 12 }}>
-                Em breve será possível adicionar exercícios específicos dentro de cada treino.
+              <div className="row" style={{ justifyContent: 'flex-end' }}>
+                <button
+                  className="ghost"
+                  onClick={() => {
+                    setShowWorkoutModal(false);
+                    setSelectedWorkout(null);
+                  }}
+                >
+                  Fechar
+                </button>
               </div>
             </div>
           </div>
