@@ -81,6 +81,7 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', pushToast }) => 
 
   const hasWorkouts = useMemo(() => workouts.length > 0, [workouts]);
 
+  // Detalhes dos músculos do treino selecionado (pra usar no modal)
   const selectedMuscleDetails = useMemo(() => {
     if (!selectedWorkout || !Array.isArray(selectedWorkout.muscleGroups)) return [];
 
@@ -283,6 +284,7 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', pushToast }) => 
       <div className="sep"></div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+        {/* NOVO TREINO */}
         <div>
           <h4 className="title" style={{ marginBottom: 12 }}>Novo Treino</h4>
           <label>Nome do treino</label>
@@ -320,6 +322,7 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', pushToast }) => 
           </div>
         </div>
 
+        {/* TREINOS CADASTRADOS */}
         <div>
           <h4 className="title" style={{ marginBottom: 12 }}>Treinos cadastrados</h4>
           {!workouts.length && <div className="muted">Nenhum treino cadastrado.</div>}
@@ -361,6 +364,7 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', pushToast }) => 
 
       <div className="sep" style={{ margin: '18px 0' }}></div>
 
+      {/* SEMANA DE TREINO */}
       <div>
         <h4 className="title" style={{ marginBottom: 12 }}>Semana de Treino</h4>
         <div
@@ -543,6 +547,7 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', pushToast }) => 
         )}
       </div>
 
+      {/* MODAL VER TREINO */}
       {showWorkoutModal && selectedWorkout && (
         <div
           style={{
@@ -554,7 +559,7 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', pushToast }) => 
             justifyContent: 'center',
             zIndex: 20,
           }}
-          >
+        >
           <div
             style={{
               background: '#0f131c',
@@ -589,62 +594,32 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', pushToast }) => 
               </div>
 
               <div>
-                <div style={{ marginTop: 16 }}>
-                  <div className="muted" style={{ marginBottom: 8, fontSize: 13 }}>
-                    Grupos musculares
-                  </div>
-
-                  {selectedMuscleDetails.length === 0 && (
-                    <p className="muted" style={{ fontSize: 13 }}>
-                      Nenhum grupo muscular selecionado.
-                    </p>
-                  )}
-
-                  {selectedMuscleDetails.length > 0 && (
-                    <div
-                      style={{
-                        display: 'grid',
-                        gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
-                        gap: 12,
-                      }}
-                    >
-                      {selectedMuscleDetails.map((group) => (
-                        <div
-                          key={group.value}
-                          style={{
-                            background: 'var(--card-2)',
-                            border: '1px solid var(--border)',
-                            borderRadius: 12,
-                            padding: 10,
-                            display: 'flex',
-                            flexDirection: 'column',
-                            alignItems: 'center',
-                            gap: 8,
-                          }}
-                        >
-                          <div
-                            style={{
-                              width: 72,
-                              height: 72,
-                              borderRadius: '999px',
-                              overflow: 'hidden',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                            }}
-                          >
-                            <img
-                              src={group.image}
-                              alt={group.label}
-                              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                            />
-                          </div>
-                          <span style={{ fontSize: 13 }}>{group.label}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                <div className="muted" style={{ fontSize: 13, marginBottom: 8 }}>
+                  Grupos musculares
                 </div>
+
+                {selectedMuscleDetails.length === 0 && (
+                  <p className="muted" style={{ fontSize: 13 }}>
+                    Nenhum grupo muscular selecionado.
+                  </p>
+                )}
+
+                {selectedMuscleDetails.length > 0 && (
+                  <div className="muscle-grid">
+                    {selectedMuscleDetails.map((muscle) => (
+                      <div key={muscle.value} className="muscle-card active">
+                        <div className="muscle-image-wrapper">
+                          <img
+                            src={muscle.image}
+                            alt={muscle.label}
+                            className="muscle-image"
+                          />
+                        </div>
+                        <span className="muscle-label">{muscle.label}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div className="row" style={{ justifyContent: 'flex-end' }}>
