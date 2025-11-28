@@ -12,6 +12,16 @@ const MUSCLE_GROUPS = [
   { value: 'glutes', label: 'Glúteos', image: musclePlaceholder }
 ];
 
+const SPORTS = [
+  { value: 'swimming', label: 'Natação', image: musclePlaceholder },
+  { value: 'volleyball', label: 'Vôlei', image: musclePlaceholder },
+  { value: 'boxing', label: 'Boxe', image: musclePlaceholder },
+  { value: 'jiujitsu', label: 'Jiu-jítsu', image: musclePlaceholder },
+  { value: 'soccer', label: 'Futebol', image: musclePlaceholder },
+  { value: 'running', label: 'Corrida', image: musclePlaceholder },
+  { value: 'beachtennis', label: 'Beach Tennis', image: musclePlaceholder }
+];
+
 const WEEK_DAYS = [
   'Segunda',
   'Terça',
@@ -31,6 +41,7 @@ const defaultSchedule = WEEK_DAYS.map((day) => ({
 
 const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', pushToast }) => {
   const [workoutForm, setWorkoutForm] = useState({ name: '', muscleGroups: [] });
+  const [selectedSports, setSelectedSports] = useState([]);
   const [workouts, setWorkouts] = useState([]);
   const [schedule, setSchedule] = useState(defaultSchedule);
   const [loading, setLoading] = useState(false);
@@ -47,9 +58,18 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', pushToast }) => 
           ? item.muscle_groups.split(',').map((g) => g.trim()).filter(Boolean)
           : [];
 
+    const rawSports = Array.isArray(item.sports)
+      ? item.sports
+      : typeof item.sports === 'string'
+        ? item.sports.split(',').map((s) => s.trim()).filter(Boolean)
+        : typeof item.sports_list === 'string'
+          ? item.sports_list.split(',').map((s) => s.trim()).filter(Boolean)
+          : [];
+
     return {
       ...item,
       muscleGroups: rawGroups,
+      sports: rawSports,
     };
   };
 
@@ -59,6 +79,18 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', pushToast }) => 
         (acc, group) => ({
           ...acc,
           [group.value]: group,
+        }),
+        {}
+      ),
+    []
+  );
+
+  const sportsMap = useMemo(
+    () =>
+      SPORTS.reduce(
+        (acc, sport) => ({
+          ...acc,
+          [sport.value]: sport,
         }),
         {}
       ),
@@ -88,6 +120,12 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', pushToast }) => 
     return MUSCLE_GROUPS.filter((group) =>
       selectedWorkout.muscleGroups.includes(group.value)
     );
+  }, [selectedWorkout]);
+
+  const selectedSportsDetails = useMemo(() => {
+    if (!selectedWorkout || !Array.isArray(selectedWorkout.sports)) return [];
+
+    return SPORTS.filter((sport) => selectedWorkout.sports.includes(sport.value));
   }, [selectedWorkout]);
 
   const notify = (message, variant = 'info') => {
@@ -160,6 +198,13 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', pushToast }) => 
     });
   };
 
+  const toggleSport = (sportValue) => {
+    setSelectedSports((prev) => {
+      const exists = prev.includes(sportValue);
+      return exists ? prev.filter((item) => item !== sportValue) : [...prev, sportValue];
+    });
+  };
+
   const handleSaveWorkout = async () => {
     if (!workoutForm.name.trim()) {
       notify('Informe o nome do treino.', 'warning');
@@ -175,6 +220,7 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', pushToast }) => 
       const payload = {
         name: workoutForm.name,
         muscleGroups: workoutForm.muscleGroups,
+        sports: selectedSports,
         userId,
         user_id: userId
       };
@@ -183,6 +229,7 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', pushToast }) => 
         body: JSON.stringify(payload)
       });
       setWorkoutForm({ name: '', muscleGroups: [] });
+      setSelectedSports([]);
       if (saved && saved.id) {
         setWorkouts((prev) => [normalizeWorkoutFromApi(saved), ...prev]);
       } else {
@@ -315,6 +362,28 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', pushToast }) => 
             })}
           </div>
 
+          <div className="muted" style={{ margin: '14px 0 6px', fontSize: 13 }}>
+            Esportes / atividades
+          </div>
+          <div className="muscle-grid">
+            {SPORTS.map((sport) => {
+              const active = selectedSports.includes(sport.value);
+              return (
+                <button
+                  key={sport.value}
+                  type="button"
+                  className={active ? 'muscle-card active' : 'muscle-card'}
+                  onClick={() => toggleSport(sport.value)}
+                >
+                  <div className="muscle-image-wrapper">
+                    <img src={sport.image} alt={sport.label} className="muscle-image" />
+                  </div>
+                  <span className="muscle-label">{sport.label}</span>
+                </button>
+              );
+            })}
+          </div>
+
           <div className="row" style={{ justifyContent: 'flex-end', marginTop: 12 }}>
             <button className="primary" onClick={handleSaveWorkout} disabled={loading}>
               {loading ? 'Salvando...' : 'Salvar treino'}
@@ -336,6 +405,13 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', pushToast }) => 
                       .map((group) => muscleMap[group]?.label || group)
                       .join(', ')}
                   </div>
+                  {(item.sports || []).length > 0 && (
+                    <div className="muted" style={{ fontSize: 13 }}>
+                      {`Esportes: ${(item.sports || [])
+                        .map((sport) => sportsMap[sport]?.label || sport)
+                        .join(', ')}`}
+                    </div>
+                  )}
                   <div className="row" style={{ gap: 8, justifyContent: 'flex-end' }}>
                     <button
                       className="ghost small"
@@ -616,6 +692,35 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', pushToast }) => 
                           />
                         </div>
                         <span className="muscle-label">{muscle.label}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <div className="muted" style={{ fontSize: 13, marginBottom: 8 }}>
+                  Esportes / atividades
+                </div>
+
+                {selectedSportsDetails.length === 0 && (
+                  <p className="muted" style={{ fontSize: 13 }}>
+                    Nenhum esporte selecionado.
+                  </p>
+                )}
+
+                {selectedSportsDetails.length > 0 && (
+                  <div className="muscle-grid">
+                    {selectedSportsDetails.map((sport) => (
+                      <div key={sport.value} className="muscle-card active">
+                        <div className="muscle-image-wrapper">
+                          <img
+                            src={sport.image}
+                            alt={sport.label}
+                            className="muscle-image"
+                          />
+                        </div>
+                        <span className="muscle-label">{sport.label}</span>
                       </div>
                     ))}
                   </div>
