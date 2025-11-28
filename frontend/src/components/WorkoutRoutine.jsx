@@ -125,7 +125,9 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', pushToast }) => 
   const selectedSportsDetails = useMemo(() => {
     if (!selectedWorkout || !Array.isArray(selectedWorkout.sports)) return [];
 
-    return SPORTS.filter((sport) => selectedWorkout.sports.includes(sport.value));
+    const sportsValues = selectedWorkout.sports.map((sport) => String(sport).trim());
+
+    return SPORTS.filter((sport) => sportsValues.includes(sport.value));
   }, [selectedWorkout]);
 
   const notify = (message, variant = 'info') => {
