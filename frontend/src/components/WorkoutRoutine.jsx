@@ -62,23 +62,6 @@ const defaultSchedule = WEEK_DAYS.map((day) => ({
   reminder: false
 }));
 
-const exerciseHelp = {
-  'Supino reto': {
-    videoUrl: 'https://www.youtube.com/embed/VjERUCFVFds',
-    tips: 'Mantenha escápulas estabilizadas, pés firmes e controle a descida.'
-  },
-  'Agachamento livre': {
-    videoUrl: 'https://www.youtube.com/embed/bEv6CCg2BC8',
-    tips: 'Coluna neutra, joelhos alinhados e desça até onde mantiver a postura.'
-  },
-  'Remada curvada': {
-    videoUrl: 'https://www.youtube.com/embed/LXn8SFOE9ag',
-    tips: 'Incline o tronco, mantenha abdômen firme e puxe com as costas.'
-  }
-};
-
-const createId = () => (crypto?.randomUUID ? crypto.randomUUID() : Math.random().toString(16).slice(2));
-
 const formatExerciseResume = (exercise) => {
   const base = `${exercise.name || 'Exercício'} ${exercise.sets || 0}x${exercise.reps || 0}`;
   const weightPart = exercise.weight ? ` – ${exercise.weight}kg` : '';
@@ -91,9 +74,9 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', pushToast }) => 
     id: null,
     name: '',
     muscleGroups: [],
+    sportsActivities: [],
     exercises: [],
   });
-  const [selectedSports, setSelectedSports] = useState([]);
   const [workouts, setWorkouts] = useState([]);
   const [schedule, setSchedule] = useState(defaultSchedule);
   const [loading, setLoading] = useState(false);
@@ -101,7 +84,6 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', pushToast }) => 
   const [userId, setUserId] = useState('');
   const [selectedWorkout, setSelectedWorkout] = useState(null);
   const [showWorkoutModal, setShowWorkoutModal] = useState(false);
-  const [exerciseModalGroup, setExerciseModalGroup] = useState(null);
   const [restDuration, setRestDuration] = useState(60);
   const [restCountdown, setRestCountdown] = useState(0);
   const [restRunning, setRestRunning] = useState(false);
@@ -161,11 +143,13 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', pushToast }) => 
   }, [selectedWorkout]);
 
   const selectedSportsDetails = useMemo(() => {
-    if (!selectedWorkout || !Array.isArray(selectedWorkout.sports)) return [];
+    if (!selectedWorkout) return [];
+    const normalized = syncSportsFromTemplate(
+      selectedWorkout.sportsActivities,
+      selectedWorkout.sports
+    );
 
-    const sportsValues = selectedWorkout.sports.map((sport) => String(sport).trim());
-
-    return SPORTS.filter((sport) => sportsValues.includes(sport.value));
+    return SPORTS.filter((sport) => normalized.includes(sport.value));
   }, [selectedWorkout]);
 
   const notify = (message, variant = 'info') => {
@@ -196,18 +180,21 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', pushToast }) => 
         ? item.muscle_groups.split(',').map((g) => g.trim()).filter(Boolean)
         : [];
 
-    const rawSports = Array.isArray(item.sports)
-      ? item.sports
-      : typeof item.sports === 'string'
-        ? item.sports.split(',').map((s) => s.trim()).filter(Boolean)
-        : typeof item.sports_list === 'string'
-          ? item.sports_list.split(',').map((s) => s.trim()).filter(Boolean)
-          : [];
+    const rawSports = Array.isArray(item.sportsActivities)
+      ? item.sportsActivities
+      : Array.isArray(item.sports)
+        ? item.sports
+        : typeof item.sports === 'string'
+          ? item.sports.split(',').map((s) => s.trim()).filter(Boolean)
+          : typeof item.sports_list === 'string'
+            ? item.sports_list.split(',').map((s) => s.trim()).filter(Boolean)
+            : [];
 
     return {
       ...item,
       muscleGroups: rawGroups,
       sports: rawSports,
+      sportsActivities: rawSports,
       exercises: Array.isArray(item.exercises) ? item.exercises : [],
     };
   };
@@ -284,49 +271,25 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', pushToast }) => 
           : [...prev.muscleGroups, group]
       };
     });
-    setExerciseModalGroup(group);
   };
 
   const toggleSport = (sportValue) => {
-    setSelectedSports((prev) => {
-      const exists = prev.includes(sportValue);
-      return exists ? prev.filter((item) => item !== sportValue) : [...prev, sportValue];
-    });
-  };
-
-  const handleExerciseChange = (exerciseId, field, value) => {
     setWorkoutForm((prev) => ({
       ...prev,
-      exercises: prev.exercises.map((ex) => (ex.id === exerciseId ? { ...ex, [field]: value } : ex)),
+      sportsActivities: prev.sportsActivities.includes(sportValue)
+        ? prev.sportsActivities.filter((item) => item !== sportValue)
+        : [...prev.sportsActivities, sportValue],
     }));
   };
 
-  const handleAddExercise = (muscleGroupId) => {
-    const base = {
-      id: createId(),
-      muscleGroupId,
-      name: '',
-      sets: 3,
-      reps: 12,
-      weight: null,
-      restSeconds: 60,
-      notes: '',
-      completed: false,
-    };
-    setWorkoutForm((prev) => ({
-      ...prev,
-      muscleGroups: prev.muscleGroups.includes(muscleGroupId)
-        ? prev.muscleGroups
-        : [...prev.muscleGroups, muscleGroupId],
-      exercises: [...prev.exercises, base],
-    }));
-  };
+  const syncSportsFromTemplate = (sportsActivities = [], sports = []) => {
+    const raw = Array.isArray(sportsActivities) && sportsActivities.length
+      ? sportsActivities
+      : Array.isArray(sports)
+        ? sports
+        : [];
 
-  const handleRemoveExercise = (exerciseId) => {
-    setWorkoutForm((prev) => ({
-      ...prev,
-      exercises: prev.exercises.filter((ex) => ex.id !== exerciseId),
-    }));
+    return raw.map((item) => String(item).trim()).filter(Boolean);
   };
 
   const handleSaveWorkout = async () => {
@@ -344,7 +307,8 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', pushToast }) => 
       const payload = {
         ...workoutForm,
         exercises: workoutForm.exercises,
-        sports: selectedSports,
+        sportsActivities: workoutForm.sportsActivities,
+        sports: workoutForm.sportsActivities,
         userId,
       };
       const url = workoutForm.id
@@ -355,8 +319,7 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', pushToast }) => 
         method,
         body: JSON.stringify(payload),
       });
-      setWorkoutForm({ id: null, name: '', muscleGroups: [], exercises: [] });
-      setSelectedSports([]);
+      setWorkoutForm({ id: null, name: '', muscleGroups: [], sportsActivities: [], exercises: [] });
       if (saved && saved.id) {
         setWorkouts((prev) => {
           const others = prev.filter((w) => w.id !== saved.id);
@@ -438,6 +401,8 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', pushToast }) => 
       date: new Date().toISOString().slice(0, 10),
       name: workoutForm.name,
       muscleGroups: workoutForm.muscleGroups,
+      sportsActivities: workoutForm.sportsActivities,
+      sports: workoutForm.sportsActivities,
       exercises: workoutForm.exercises.map((ex) => ({
         ...ex,
         completed: true,
@@ -528,10 +493,6 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', pushToast }) => 
     setRestRunning(true);
   };
 
-  const filteredExercises = workoutForm.exercises.filter(
-    (ex) => ex.muscleGroupId === exerciseModalGroup
-  );
-
   return (
     <section className="card" style={{ marginTop: 16 }}>
       <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
@@ -602,7 +563,7 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', pushToast }) => 
             </div>
             <div className="muscle-grid">
               {SPORTS.map((sport) => {
-                const active = selectedSports.includes(sport.value);
+                const active = workoutForm.sportsActivities.includes(sport.value);
                 return (
                   <button
                     key={sport.value}
@@ -642,7 +603,7 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', pushToast }) => 
               <button
                 className="ghost"
                 disabled={!workoutForm.id}
-                onClick={() => setWorkoutForm({ id: null, name: '', muscleGroups: [], exercises: [] })}
+                onClick={() => setWorkoutForm({ id: null, name: '', muscleGroups: [], sportsActivities: [], exercises: [] })}
               >
                 Limpar edição
               </button>
@@ -687,10 +648,13 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', pushToast }) => 
                             id: item.id,
                             name: item.name,
                             muscleGroups: item.muscleGroups || [],
+                            sportsActivities: syncSportsFromTemplate(item.sportsActivities, item.sports),
                             exercises: item.exercises || [],
                           });
-                          setSelectedWorkout(item);
-                          setSelectedSports(item.sports || []);
+                          setSelectedWorkout({
+                            ...item,
+                            sportsActivities: syncSportsFromTemplate(item.sportsActivities, item.sports),
+                          });
                           setShowWorkoutModal(true);
                         }}
                         disabled={loading}
@@ -1040,7 +1004,6 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', pushToast }) => 
                 onClick={() => {
                   setShowWorkoutModal(false);
                   setSelectedWorkout(null);
-                  setExerciseModalGroup(null);
                 }}
               >
                 Fechar
@@ -1079,7 +1042,7 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', pushToast }) => 
                         type="button"
                         key={muscle.value}
                         className="muscle-card active"
-                        onClick={() => setExerciseModalGroup(muscle.value)}
+                        style={{ cursor: 'default' }}
                       >
                         <div className="muscle-image-wrapper">
                           <img
@@ -1095,103 +1058,36 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', pushToast }) => 
                 )}
               </div>
 
+              {/* Exibe esportes/atividades selecionados. */}
               <div>
-                <div className="row" style={{ justifyContent: 'space-between', marginBottom: 8 }}>
-                  <div className="muted" style={{ fontSize: 13 }}>
-                    Exercícios ({filteredExercises.length})
-                  </div>
-                  <button
-                    className="ghost small"
-                    onClick={() => handleAddExercise(exerciseModalGroup || workoutForm.muscleGroups[0] || 'peito')}
-                  >
-                    Adicionar exercício
-                  </button>
+                <div className="muted" style={{ fontSize: 13, marginBottom: 8 }}>
+                  Esportes / atividades
                 </div>
 
-                {filteredExercises.length === 0 && (
-                  <div className="muted" style={{ fontSize: 13 }}>
-                    Selecione um grupo muscular acima para adicionar exercícios.
-                  </div>
+                {selectedSportsDetails.length === 0 && (
+                  <p className="muted" style={{ fontSize: 13 }}>
+                    Nenhuma atividade selecionada.
+                  </p>
                 )}
 
-                {filteredExercises.length > 0 && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                    {filteredExercises.map((exercise) => (
-                      <div
-                        key={exercise.id}
-                        style={{
-                          border: '1px solid rgba(255,255,255,0.08)',
-                          padding: 12,
-                          borderRadius: 10,
-                          background: '#0f131c',
-                          display: 'grid',
-                          gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-                          gap: 8,
-                        }}
+                {selectedSportsDetails.length > 0 && (
+                  <div className="muscle-grid">
+                    {selectedSportsDetails.map((sport) => (
+                      <button
+                        type="button"
+                        key={sport.value}
+                        className="muscle-card active"
+                        style={{ cursor: 'default', pointerEvents: 'none' }}
                       >
-                        <input
-                          placeholder="Nome do exercício"
-                          value={exercise.name}
-                          onChange={(e) => handleExerciseChange(exercise.id, 'name', e.target.value)}
-                        />
-                        <input
-                          type="number"
-                          placeholder="Séries"
-                          value={exercise.sets}
-                          onChange={(e) => handleExerciseChange(exercise.id, 'sets', Number(e.target.value))}
-                        />
-                        <input
-                          type="number"
-                          placeholder="Repetições"
-                          value={exercise.reps}
-                          onChange={(e) => handleExerciseChange(exercise.id, 'reps', Number(e.target.value))}
-                        />
-                        <input
-                          type="number"
-                          placeholder="Peso (kg)"
-                          value={exercise.weight ?? ''}
-                          onChange={(e) => handleExerciseChange(exercise.id, 'weight', e.target.value ? Number(e.target.value) : null)}
-                        />
-                        <input
-                          type="number"
-                          placeholder="Descanso (s)"
-                          value={exercise.restSeconds}
-                          onChange={(e) => handleExerciseChange(exercise.id, 'restSeconds', Number(e.target.value))}
-                        />
-                        <textarea
-                          placeholder="Notas"
-                          value={exercise.notes || ''}
-                          onChange={(e) => handleExerciseChange(exercise.id, 'notes', e.target.value)}
-                          rows={2}
-                          style={{ gridColumn: '1 / -1' }}
-                        ></textarea>
-                        <div className="row" style={{ justifyContent: 'space-between', gridColumn: '1 / -1' }}>
-                          <button className="ghost small" onClick={() => handleRemoveExercise(exercise.id)}>
-                            Remover
-                          </button>
-                          {exerciseHelp[exercise.name] && (
-                            <details>
-                              <summary className="ghost small" style={{ cursor: 'pointer' }}>
-                                Ver execução
-                              </summary>
-                              <div style={{ marginTop: 8 }}>
-                                <div style={{ aspectRatio: '16/9', width: '100%' }}>
-                                  <iframe
-                                    src={exerciseHelp[exercise.name].videoUrl}
-                                    title={exercise.name}
-                                    style={{ width: '100%', height: '100%', border: 'none', borderRadius: 8 }}
-                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                    allowFullScreen
-                                  ></iframe>
-                                </div>
-                                <div className="muted" style={{ marginTop: 6, fontSize: 13 }}>
-                                  {exerciseHelp[exercise.name].tips}
-                                </div>
-                              </div>
-                            </details>
-                          )}
+                        <div className="muscle-image-wrapper">
+                          <img
+                            src={sport.image}
+                            alt={sport.label}
+                            className="muscle-image"
+                          />
                         </div>
-                      </div>
+                        <span className="muscle-label">{sport.label}</span>
+                      </button>
                     ))}
                   </div>
                 )}
