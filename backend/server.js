@@ -1,12 +1,14 @@
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
+import fs from "fs/promises";
+import path from "path";
+import { fileURLToPath } from "url";
 import { supabase } from "./supabase.js";
 import {
   createWorkoutSession,
   listWorkoutSessions,
   listWorkoutTemplates,
-  deleteWorkoutTemplate,
   saveWorkoutReminder,
   summarizeProgress,
   upsertWorkoutTemplate,
@@ -15,6 +17,31 @@ import {
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const dataDir = path.join(__dirname, "data");
+
+const resolveDataPath = (fileName) => path.join(dataDir, fileName);
+
+const loadJsonArray = async (fileName) => {
+  await fs.mkdir(dataDir, { recursive: true });
+  const filePath = resolveDataPath(fileName);
+  try {
+    const raw = await fs.readFile(filePath, "utf-8");
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (err) {
+    if (err.code === "ENOENT") return [];
+    throw err;
+  }
+};
+
+const saveJsonArray = async (fileName, data) => {
+  await fs.mkdir(dataDir, { recursive: true });
+  const filePath = resolveDataPath(fileName);
+  await fs.writeFile(filePath, JSON.stringify(data, null, 2));
+};
 
 app.post("/create-user", async (req, res) => {
   try {
@@ -465,19 +492,32 @@ app.put("/api/workouts/templates/:id", async (req, res) => {
 });
 
 app.delete("/api/workouts/templates/:id", async (req, res) => {
-  try {
-    const { id } = req.params;
-    const userId = getUserIdFromRequest(req) || req.body?.userId;
+  const { id } = req.params;
 
-    if (!id || !userId) {
-      return res.status(400).json({ error: "id e userId são obrigatórios" });
+  try {
+    // Exclusão de template de treino
+    if (supabase) {
+      const { error } = await supabase
+        .from("workout_templates")
+        .delete()
+        .eq("id", id);
+
+      if (error) {
+        console.error("Erro Supabase ao excluir template", error);
+        // Fallback para JSON se houver erro
+      } else {
+        return res.status(204).send();
+      }
     }
 
-    await deleteWorkoutTemplate(id, userId);
-    return res.json({ success: true });
+    const templates = await loadJsonArray("workout_templates.json");
+    const updated = templates.filter((tpl) => tpl.id !== id);
+    await saveJsonArray("workout_templates.json", updated);
+
+    return res.status(204).send();
   } catch (err) {
     console.error("Erro ao excluir template", err);
-    return res.status(500).json({ error: "Erro interno ao excluir template" });
+    return res.status(500).json({ error: "Erro ao excluir template" });
   }
 });
 

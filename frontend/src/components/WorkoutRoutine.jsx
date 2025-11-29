@@ -68,6 +68,185 @@ const formatExerciseResume = (exercise) => {
   return `${base}${weightPart}`;
 };
 
+const WorkoutRestTimer = ({
+  restDuration,
+  restCountdown,
+  restFinished,
+  onChangeDuration,
+  onStart,
+}) => (
+  <div
+    style={{
+      border: '1px solid rgba(255,255,255,0.1)',
+      borderRadius: 12,
+      padding: 12,
+      display: 'flex',
+      flexDirection: 'column',
+      gap: 8,
+    }}
+  >
+    <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+      <div>
+        <div style={{ fontWeight: 600 }}>Timer de descanso</div>
+        <div className="muted" style={{ fontSize: 12 }}>
+          Escolha um tempo e inicie para contar o descanso do exercício.
+        </div>
+      </div>
+      <div className="row" style={{ gap: 8 }}>
+        {[30, 45, 60, 90].map((sec) => (
+          <button
+            key={sec}
+            className={restDuration === sec ? 'primary small' : 'ghost small'}
+            onClick={() => onChangeDuration(sec)}
+          >
+            {sec}s
+          </button>
+        ))}
+      </div>
+    </div>
+    <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+      <div style={{ fontSize: 28, fontWeight: 700 }}>
+        {restCountdown || restDuration}s
+      </div>
+      <button className="primary" onClick={onStart}>
+        Iniciar descanso
+      </button>
+    </div>
+    {restFinished && (
+      <div style={{ color: '#50be78', fontWeight: 600 }}>Descanso finalizado!</div>
+    )}
+  </div>
+);
+
+const ViewWorkoutModal = ({
+  open,
+  workout,
+  onClose,
+  muscleMap,
+  sportsMap,
+  restDuration,
+  restCountdown,
+  restFinished,
+  onChangeDuration,
+  onStart,
+}) => {
+  // Modal de visualização de treino
+  if (!open || !workout) return null;
+
+  const muscleGroups = Array.isArray(workout.muscleGroups) ? workout.muscleGroups : [];
+  const sportsActivities = Array.isArray(workout.sportsActivities)
+    ? workout.sportsActivities
+    : [];
+
+  const muscleLabels = muscleGroups.map((mg) => muscleMap[mg]?.label || mg);
+  const sportLabels = sportsActivities.map((act) => sportsMap[act]?.label || act);
+
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        background: 'rgba(0, 0, 0, 0.6)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 20,
+      }}
+    >
+      <div
+        style={{
+          background: '#0f131c',
+          borderRadius: 16,
+          padding: 24,
+          width: 'min(720px, 90vw)',
+          boxShadow: '0 16px 40px rgba(0,0,0,0.4)',
+          border: '1px solid rgba(255,255,255,0.08)',
+          maxHeight: '90vh',
+          overflow: 'auto',
+        }}
+      >
+        <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+          <h4 style={{ margin: 0 }}>Detalhes do treino</h4>
+          <button className="ghost" onClick={onClose}>
+            Fechar
+          </button>
+        </div>
+
+        <div className="sep" style={{ margin: '12px 0' }}></div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div className="field">
+            <label>Nome do treino</label>
+            <div className="value" style={{ fontWeight: 600 }}>
+              {workout.name || 'Treino sem nome'}
+            </div>
+          </div>
+
+          <div className="field">
+            <label>Grupos musculares</label>
+            <div className="chips" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {muscleLabels.length > 0 ? (
+                muscleLabels.map((mg) => (
+                  <span key={mg} className="chip">
+                    {mg}
+                  </span>
+                ))
+              ) : (
+                <span className="muted">Nenhum grupo selecionado</span>
+              )}
+            </div>
+          </div>
+
+          <div className="field">
+            <label>Esportes / atividades</label>
+            <div className="chips" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {sportLabels.length > 0 ? (
+                sportLabels.map((act) => (
+                  <span key={act} className="chip">
+                    {act}
+                  </span>
+                ))
+              ) : (
+                <span className="muted">Nenhuma atividade selecionada</span>
+              )}
+            </div>
+          </div>
+
+          {Array.isArray(workout.exercises) && workout.exercises.length > 0 && (
+            <div className="field">
+              <label>Exercícios</label>
+              <ul className="exercise-list" style={{ paddingLeft: 18 }}>
+                {workout.exercises.map((ex) => (
+                  <li key={ex.id || ex.name} style={{ marginBottom: 6 }}>
+                    <strong>{ex.name}</strong>{' '}
+                    {ex.sets && ex.reps && (
+                      <span>
+                        {ex.sets} x {ex.reps}
+                      </span>
+                    )}
+                    {typeof ex.weight === 'number' && <span> – {ex.weight} kg</span>}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          <div className="field">
+            <label>Timer de descanso</label>
+            <WorkoutRestTimer
+              restDuration={restDuration}
+              restCountdown={restCountdown}
+              restFinished={restFinished}
+              onChangeDuration={onChangeDuration}
+              onStart={onStart}
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', pushToast }) => {
   const [activeTab, setActiveTab] = useState('config');
   const [workoutForm, setWorkoutForm] = useState({
@@ -82,8 +261,8 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', pushToast }) => 
   const [loading, setLoading] = useState(false);
   const [savingSchedule, setSavingSchedule] = useState(false);
   const [userId, setUserId] = useState('');
-  const [selectedWorkout, setSelectedWorkout] = useState(null);
-  const [showWorkoutModal, setShowWorkoutModal] = useState(false);
+  const [viewWorkout, setViewWorkout] = useState(null);
+  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [restDuration, setRestDuration] = useState(60);
   const [restCountdown, setRestCountdown] = useState(0);
   const [restRunning, setRestRunning] = useState(false);
@@ -133,24 +312,6 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', pushToast }) => 
   }, []);
 
   const hasWorkouts = useMemo(() => workouts.length > 0, [workouts]);
-
-  const selectedMuscleDetails = useMemo(() => {
-    if (!selectedWorkout || !Array.isArray(selectedWorkout.muscleGroups)) return [];
-
-    return MUSCLE_GROUPS.filter((group) =>
-      selectedWorkout.muscleGroups.includes(group.value)
-    );
-  }, [selectedWorkout]);
-
-  const selectedSportsDetails = useMemo(() => {
-    if (!selectedWorkout) return [];
-    const normalized = syncSportsFromTemplate(
-      selectedWorkout.sportsActivities,
-      selectedWorkout.sports
-    );
-
-    return SPORTS.filter((sport) => normalized.includes(sport.value));
-  }, [selectedWorkout]);
 
   const notify = (message, variant = 'info') => {
     if (typeof pushToast === 'function') {
@@ -292,6 +453,27 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', pushToast }) => 
     return raw.map((item) => String(item).trim()).filter(Boolean);
   };
 
+  const handleOpenViewWorkout = (template) => {
+    const normalizedSports = syncSportsFromTemplate(
+      template.sportsActivities,
+      template.sports
+    );
+    setWorkoutForm({
+      id: template.id || null,
+      name: template.name || '',
+      muscleGroups: template.muscleGroups || [],
+      sportsActivities: normalizedSports,
+      exercises: template.exercises || [],
+    });
+    setViewWorkout({ ...template, sportsActivities: normalizedSports });
+    setIsViewModalOpen(true);
+  };
+
+  const handleCloseViewWorkout = () => {
+    setIsViewModalOpen(false);
+    setViewWorkout(null);
+  };
+
   const handleSaveWorkout = async () => {
     if (!workoutForm.name.trim()) {
       notify('Informe o nome do treino.', 'warning');
@@ -349,21 +531,24 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', pushToast }) => 
   };
 
   const handleDeleteWorkout = async (id) => {
+    if (!window.confirm('Tem certeza que deseja excluir este treino?')) return;
+
     try {
-      setLoading(true);
-      await fetchJson(`${apiBaseUrl}/api/workouts/templates/${id}?userId=${userId}`, {
-        method: 'DELETE'
+      const response = await fetch(`${apiBaseUrl}/api/workouts/templates/${id}`, {
+        method: 'DELETE',
       });
-      setWorkouts((prev) => prev.filter((item) => item.id !== id));
+
+      if (!response.ok) {
+        console.error('Falha ao excluir treino');
+        return;
+      }
+
+      setWorkouts((prev) => prev.filter((tpl) => tpl.id !== id));
       setSchedule((prev) =>
         prev.map((slot) => (slot.workout_id === id ? { ...slot, workout_id: '' } : slot))
       );
-      notify('Treino removido.', 'success');
     } catch (err) {
-      console.warn('Erro ao excluir treino', err);
-      notify('Não foi possível excluir o treino.', 'danger');
-    } finally {
-      setLoading(false);
+      console.error('Erro ao excluir treino', err);
     }
   };
 
@@ -624,47 +809,50 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', pushToast }) => 
             {!workouts.length && <div className="muted">Nenhum treino cadastrado.</div>}
             {workouts.length > 0 && (
               <div className="table">
-                {workouts.map((item) => (
-                  <div className="table-row" key={item.id || item.name}>
-                    <div>
-                      <div style={{ fontWeight: 600 }}>{item.name}</div>
-                      <div className="muted" style={{ fontSize: 13 }}>
-                        {(item.muscleGroups || [])
-                          .map((group) => muscleMap[group]?.label || group)
-                          .join(', ')}
+                {workouts.map((template) => (
+                  <div
+                    key={template.id || template.name}
+                    className="workout-template-item table-row"
+                  >
+                    <div className="workout-template-header">
+                      <strong>{template.name}</strong>
+                      <div className="workout-template-subtitle">
+                        {Array.isArray(template.muscleGroups) && template.muscleGroups.length > 0 && (
+                          <span>
+                            {(template.muscleGroups || [])
+                              .map((group) => muscleMap[group]?.label || group)
+                              .join(', ')}
+                          </span>
+                        )}
                       </div>
-                      {(item.exercises || []).length > 0 && (
-                        <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
-                          {(item.exercises || []).slice(0, 2).map(formatExerciseResume).join('; ')}
-                          {item.exercises.length > 2 ? '...' : ''}
+                      {Array.isArray(template.sportsActivities) && template.sportsActivities.length > 0 && (
+                        <div className="workout-template-subtitle">
+                          Esportes/atividades:{' '}
+                          {(template.sportsActivities || [])
+                            .map((sport) => sportsMap[sport]?.label || sport)
+                            .join(', ')}
                         </div>
                       )}
                     </div>
-                    <div className="row" style={{ gap: 8, justifyContent: 'flex-end' }}>
+
+                    <div className="workout-template-actions">
                       <button
-                        className="ghost small"
-                        onClick={() => {
-                          setWorkoutForm({
-                            id: item.id,
-                            name: item.name,
-                            muscleGroups: item.muscleGroups || [],
-                            sportsActivities: syncSportsFromTemplate(item.sportsActivities, item.sports),
-                            exercises: item.exercises || [],
-                          });
-                          setSelectedWorkout({
-                            ...item,
-                            sportsActivities: syncSportsFromTemplate(item.sportsActivities, item.sports),
-                          });
-                          setShowWorkoutModal(true);
-                        }}
-                        disabled={loading}
+                        type="button"
+                        className="ghost small btn-outline"
+                        onClick={() => handleOpenViewWorkout({
+                          ...template,
+                          sportsActivities: syncSportsFromTemplate(
+                            template.sportsActivities,
+                            template.sports
+                          )
+                        })}
                       >
-                        Editar treino
+                        Ver treino
                       </button>
                       <button
-                        className="ghost small"
-                        onClick={() => handleDeleteWorkout(item.id)}
-                        disabled={loading}
+                        type="button"
+                        className="ghost small btn-danger-outline"
+                        onClick={() => handleDeleteWorkout(template.id)}
                       >
                         Excluir
                       </button>
@@ -972,184 +1160,18 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', pushToast }) => 
         </div>
       )}
 
-      {/* MODAL VER TREINO + EXERCÍCIOS */}
-      {showWorkoutModal && selectedWorkout && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0, 0, 0, 0.6)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 20,
-          }}
-        >
-          <div
-            style={{
-              background: '#0f131c',
-              borderRadius: 16,
-              padding: 24,
-              width: 'min(720px, 90vw)',
-              boxShadow: '0 16px 40px rgba(0,0,0,0.4)',
-              border: '1px solid rgba(255,255,255,0.08)',
-              maxHeight: '90vh',
-              overflow: 'auto',
-            }}
-          >
-            <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
-              <h4 style={{ margin: 0 }}>Detalhes do treino</h4>
-              <button
-                className="ghost"
-                onClick={() => {
-                  setShowWorkoutModal(false);
-                  setSelectedWorkout(null);
-                }}
-              >
-                Fechar
-              </button>
-            </div>
-
-            <div className="sep" style={{ margin: '12px 0' }}></div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              <div>
-                <div className="muted" style={{ fontSize: 13 }}>
-                  Nome do treino
-                </div>
-                <input
-                  value={workoutForm.name}
-                  onChange={(e) => setWorkoutForm((prev) => ({ ...prev, name: e.target.value }))}
-                  placeholder="Nome do treino"
-                />
-              </div>
-
-              <div>
-                <div className="muted" style={{ fontSize: 13, marginBottom: 8 }}>
-                  Grupos musculares
-                </div>
-
-                {selectedMuscleDetails.length === 0 && (
-                  <p className="muted" style={{ fontSize: 13 }}>
-                    Nenhum grupo muscular selecionado.
-                  </p>
-                )}
-
-                {selectedMuscleDetails.length > 0 && (
-                  <div className="muscle-grid">
-                    {selectedMuscleDetails.map((muscle) => (
-                      <button
-                        type="button"
-                        key={muscle.value}
-                        className="muscle-card active"
-                        style={{ cursor: 'default' }}
-                      >
-                        <div className="muscle-image-wrapper">
-                          <img
-                            src={muscle.image}
-                            alt={muscle.label}
-                            className="muscle-image"
-                          />
-                        </div>
-                        <span className="muscle-label">{muscle.label}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Exibe esportes/atividades selecionados. */}
-              <div>
-                <div className="muted" style={{ fontSize: 13, marginBottom: 8 }}>
-                  Esportes / atividades
-                </div>
-
-                {selectedSportsDetails.length === 0 && (
-                  <p className="muted" style={{ fontSize: 13 }}>
-                    Nenhuma atividade selecionada.
-                  </p>
-                )}
-
-                {selectedSportsDetails.length > 0 && (
-                  <div className="muscle-grid">
-                    {selectedSportsDetails.map((sport) => (
-                      <button
-                        type="button"
-                        key={sport.value}
-                        className="muscle-card active"
-                        style={{ cursor: 'default', pointerEvents: 'none' }}
-                      >
-                        <div className="muscle-image-wrapper">
-                          <img
-                            src={sport.image}
-                            alt={sport.label}
-                            className="muscle-image"
-                          />
-                        </div>
-                        <span className="muscle-label">{sport.label}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <div
-                style={{
-                  border: '1px solid rgba(255,255,255,0.1)',
-                  borderRadius: 12,
-                  padding: 12,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: 8,
-                }}
-              >
-                <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div>
-                    <div style={{ fontWeight: 600 }}>Timer de descanso</div>
-                    <div className="muted" style={{ fontSize: 12 }}>
-                      Escolha um tempo e inicie para contar o descanso do exercício.
-                    </div>
-                  </div>
-                  <div className="row" style={{ gap: 8 }}>
-                    {[30, 45, 60, 90].map((sec) => (
-                      <button
-                        key={sec}
-                        className={restDuration === sec ? 'primary small' : 'ghost small'}
-                        onClick={() => setRestDuration(sec)}
-                      >
-                        {sec}s
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div style={{ fontSize: 28, fontWeight: 700 }}>
-                    {restCountdown || restDuration}s
-                  </div>
-                  <button className="primary" onClick={startRestTimer}>
-                    Iniciar descanso
-                  </button>
-                </div>
-                {restFinished && (
-                  <div style={{ color: '#50be78', fontWeight: 600 }}>Descanso finalizado!</div>
-                )}
-              </div>
-
-              <div className="row" style={{ justifyContent: 'flex-end' }}>
-                <button
-                  className="primary"
-                  onClick={() => {
-                    setShowWorkoutModal(false);
-                    setSelectedWorkout(null);
-                  }}
-                >
-                  Fechar
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <ViewWorkoutModal
+        open={isViewModalOpen}
+        workout={viewWorkout}
+        onClose={handleCloseViewWorkout}
+        muscleMap={muscleMap}
+        sportsMap={sportsMap}
+        restDuration={restDuration}
+        restCountdown={restCountdown}
+        restFinished={restFinished}
+        onChangeDuration={setRestDuration}
+        onStart={startRestTimer}
+      />
     </section>
   );
 };
