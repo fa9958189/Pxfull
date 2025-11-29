@@ -464,3 +464,67 @@ canvas{ background:transparent; }
 .workout-schedule {
   display: none;
 }
+
+/* Modal de visualização de treino */
+.workout-view-modal .modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.workout-details-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 16px;
+  padding: 16px 0 24px;
+}
+
+.workout-details-content .field {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 8px;
+}
+
+.workout-view-modal .field label {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--muted);
+  text-align: center;
+  width: 100%;
+}
+
+.chips-with-image {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+}
+
+.chip-with-image {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: #111827;
+  border: 1px solid #1f2937;
+}
+
+.chip-with-image .chip-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  object-fit: cover;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.workout-timer-section {
+  margin-top: 8px;
+}
