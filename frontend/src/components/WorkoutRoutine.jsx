@@ -45,6 +45,22 @@ const SPORTS = muscleGroups.slice(8).map(({ id, name, image }) => ({
   image
 }));
 
+const getMuscleGroupByLabel = (label) => {
+  const normalized = String(label || '').toLowerCase();
+  return MUSCLE_GROUPS.find(
+    (group) =>
+      group.label.toLowerCase() === normalized ||
+      group.value.toLowerCase() === normalized
+  );
+};
+
+const getSportByLabel = (label) => {
+  const normalized = String(label || '').toLowerCase();
+  return SPORTS.find(
+    (sport) => sport.label.toLowerCase() === normalized || sport.value.toLowerCase() === normalized
+  );
+};
+
 const WEEK_DAYS = [
   'Segunda',
   'Terça',
@@ -138,8 +154,24 @@ const ViewWorkoutModal = ({
     ? workout.sportsActivities
     : [];
 
-  const muscleLabels = muscleGroups.map((mg) => muscleMap[mg]?.label || mg);
-  const sportLabels = sportsActivities.map((act) => sportsMap[act]?.label || act);
+  const chipStyle = {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 8,
+    padding: '6px 10px',
+    borderRadius: 12,
+    background: 'rgba(255,255,255,0.04)',
+    border: '1px solid rgba(255,255,255,0.08)',
+  };
+
+  const chipImageStyle = {
+    width: 32,
+    height: 32,
+    borderRadius: '50%',
+    objectFit: 'cover',
+    background: 'rgba(255,255,255,0.08)',
+    border: '1px solid rgba(255,255,255,0.06)',
+  };
 
   return (
     <div
@@ -185,12 +217,22 @@ const ViewWorkoutModal = ({
           <div className="field">
             <label>Grupos musculares</label>
             <div className="chips" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              {muscleLabels.length > 0 ? (
-                muscleLabels.map((mg) => (
-                  <span key={mg} className="chip">
-                    {mg}
-                  </span>
-                ))
+              {muscleGroups.length > 0 ? (
+                muscleGroups.map((mg) => {
+                  const def = getMuscleGroupByLabel(mg) || muscleMap[mg];
+                  return (
+                    <div key={mg} className="chip" style={chipStyle}>
+                      {def?.image && (
+                        <img
+                          src={def.image}
+                          alt={def.label || mg}
+                          style={chipImageStyle}
+                        />
+                      )}
+                      <span>{def?.label || mg}</span>
+                    </div>
+                  );
+                })
               ) : (
                 <span className="muted">Nenhum grupo selecionado</span>
               )}
@@ -200,12 +242,22 @@ const ViewWorkoutModal = ({
           <div className="field">
             <label>Esportes / atividades</label>
             <div className="chips" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              {sportLabels.length > 0 ? (
-                sportLabels.map((act) => (
-                  <span key={act} className="chip">
-                    {act}
-                  </span>
-                ))
+              {sportsActivities.length > 0 ? (
+                sportsActivities.map((act) => {
+                  const def = getSportByLabel(act) || sportsMap[act];
+                  return (
+                    <div key={act} className="chip" style={chipStyle}>
+                      {def?.image && (
+                        <img
+                          src={def.image}
+                          alt={def.label || act}
+                          style={chipImageStyle}
+                        />
+                      )}
+                      <span>{def?.label || act}</span>
+                    </div>
+                  );
+                })
               ) : (
                 <span className="muted">Nenhuma atividade selecionada</span>
               )}
