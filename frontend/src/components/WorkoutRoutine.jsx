@@ -154,25 +154,6 @@ const ViewWorkoutModal = ({
     ? workout.sportsActivities
     : [];
 
-  const chipStyle = {
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: 8,
-    padding: '6px 10px',
-    borderRadius: 12,
-    background: 'rgba(255,255,255,0.04)',
-    border: '1px solid rgba(255,255,255,0.08)',
-  };
-
-  const chipImageStyle = {
-    width: 32,
-    height: 32,
-    borderRadius: '50%',
-    objectFit: 'cover',
-    background: 'rgba(255,255,255,0.08)',
-    border: '1px solid rgba(255,255,255,0.06)',
-  };
-
   return (
     <div
       style={{
@@ -186,6 +167,7 @@ const ViewWorkoutModal = ({
       }}
     >
       <div
+        className="workout-view-modal"
         style={{
           background: '#0f131c',
           borderRadius: 16,
@@ -206,61 +188,63 @@ const ViewWorkoutModal = ({
 
         <div className="sep" style={{ margin: '12px 0' }}></div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <div className="field">
-            <label>Nome do treino</label>
-            <div className="value" style={{ fontWeight: 600 }}>
-              {workout.name || 'Treino sem nome'}
+        <section className="modal-body">
+          <div className="workout-details-content">
+            <div className="field">
+              <label>Nome do treino</label>
+              <div className="value" style={{ fontWeight: 600 }}>
+                {workout.name || 'Treino sem nome'}
+              </div>
             </div>
-          </div>
 
-          <div className="field">
-            <label>Grupos musculares</label>
-            <div className="chips" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              {muscleGroups.length > 0 ? (
-                muscleGroups.map((mg) => {
-                  const def = getMuscleGroupByLabel(mg) || muscleMap[mg];
-                  return (
-                    <div key={mg} className="chip" style={chipStyle}>
-                      {def?.image && (
-                        <img
-                          src={def.image}
-                          alt={def.label || mg}
-                          style={chipImageStyle}
-                        />
-                      )}
-                      <span>{def?.label || mg}</span>
-                    </div>
-                  );
-                })
-              ) : (
-                <span className="muted">Nenhum grupo selecionado</span>
-              )}
+            <div className="field">
+              <label>Grupos musculares</label>
+              <div className="chips chips-with-image">
+                {muscleGroups.length > 0 ? (
+                  muscleGroups.map((mg) => {
+                    const def = getMuscleGroupByLabel(mg) || muscleMap[mg];
+                    return (
+                      <div key={mg} className="chip chip-with-image">
+                        {def?.image && (
+                          <img
+                            src={def.image}
+                            alt={def.label || mg}
+                            className="chip-icon"
+                          />
+                        )}
+                        <span>{def?.label || mg}</span>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <span className="muted">Nenhum grupo selecionado</span>
+                )}
+              </div>
             </div>
-          </div>
 
-          <div className="field">
-            <label>Esportes / atividades</label>
-            <div className="chips" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              {sportsActivities.length > 0 ? (
-                sportsActivities.map((act) => {
-                  const def = getSportByLabel(act) || sportsMap[act];
-                  return (
-                    <div key={act} className="chip" style={chipStyle}>
-                      {def?.image && (
-                        <img
-                          src={def.image}
-                          alt={def.label || act}
-                          style={chipImageStyle}
-                        />
-                      )}
-                      <span>{def?.label || act}</span>
-                    </div>
-                  );
-                })
-              ) : (
-                <span className="muted">Nenhuma atividade selecionada</span>
-              )}
+            <div className="field">
+              <label>Esportes / atividades</label>
+              <div className="chips chips-with-image">
+                {sportsActivities.length > 0 ? (
+                  sportsActivities.map((act) => {
+                    const def = getSportByLabel(act) || sportsMap[act];
+                    return (
+                      <div key={act} className="chip chip-with-image">
+                        {def?.image && (
+                          <img
+                            src={def.image}
+                            alt={def.label || act}
+                            className="chip-icon"
+                          />
+                        )}
+                        <span>{def?.label || act}</span>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <span className="muted">Nenhuma atividade selecionada</span>
+                )}
+              </div>
             </div>
           </div>
 
@@ -283,17 +267,19 @@ const ViewWorkoutModal = ({
             </div>
           )}
 
-          <div className="field">
-            <label>Timer de descanso</label>
-            <WorkoutRestTimer
-              restDuration={restDuration}
-              restCountdown={restCountdown}
-              restFinished={restFinished}
-              onChangeDuration={onChangeDuration}
-              onStart={onStart}
-            />
+          <div className="workout-timer-section">
+            <div className="field">
+              <label>Timer de descanso</label>
+              <WorkoutRestTimer
+                restDuration={restDuration}
+                restCountdown={restCountdown}
+                restFinished={restFinished}
+                onChangeDuration={onChangeDuration}
+                onStart={onStart}
+              />
+            </div>
           </div>
-        </div>
+        </section>
       </div>
     </div>
   );
