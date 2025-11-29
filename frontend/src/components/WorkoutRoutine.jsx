@@ -304,7 +304,7 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', pushToast }) => 
     sportsActivities: [],
     exercises: [],
   });
-  const [workouts, setWorkouts] = useState([]);
+  const [routines, setRoutines] = useState([]);
   const [schedule, setSchedule] = useState(defaultSchedule);
   const [loading, setLoading] = useState(false);
   const [savingSchedule, setSavingSchedule] = useState(false);
@@ -359,7 +359,7 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', pushToast }) => 
     });
   }, []);
 
-  const hasWorkouts = useMemo(() => workouts.length > 0, [workouts]);
+  const hasRoutines = useMemo(() => routines.length > 0, [routines]);
 
   const notify = (message, variant = 'info') => {
     if (typeof pushToast === 'function') {
@@ -382,45 +382,50 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', pushToast }) => 
     return data;
   };
 
-  const normalizeWorkoutFromApi = (item) => {
-    const rawGroups = Array.isArray(item.muscleGroups)
-      ? item.muscleGroups
-      : typeof item.muscle_groups === 'string'
-        ? item.muscle_groups.split(',').map((g) => g.trim()).filter(Boolean)
-        : [];
+  const normalizeRoutineFromApi = (item) => {
+    const normalizeList = (value, fallback = []) => {
+      if (Array.isArray(value)) return value;
+      if (typeof value === 'string') {
+        return value.split(',').map((g) => g.trim()).filter(Boolean);
+      }
+      if (typeof fallback === 'string') {
+        return fallback.split(',').map((g) => g.trim()).filter(Boolean);
+      }
+      return Array.isArray(fallback) ? fallback : [];
+    };
 
-    const rawSports = Array.isArray(item.sportsActivities)
-      ? item.sportsActivities
-      : Array.isArray(item.sports)
-        ? item.sports
-        : typeof item.sports === 'string'
-          ? item.sports.split(',').map((s) => s.trim()).filter(Boolean)
-          : typeof item.sports_list === 'string'
-            ? item.sports_list.split(',').map((s) => s.trim()).filter(Boolean)
-            : [];
+    const muscleGroups = normalizeList(item?.muscleGroups, item?.muscle_group);
+    const sportsActivities = normalizeList(
+      item?.sportsActivities,
+      item?.sports_list || item?.sports
+    );
 
     return {
       ...item,
-      muscleGroups: rawGroups,
-      sports: rawSports,
-      sportsActivities: rawSports,
-      exercises: Array.isArray(item.exercises) ? item.exercises : [],
+      muscleGroups,
+      sports: sportsActivities,
+      sportsActivities,
+      exercises: Array.isArray(item?.exercises) ? item.exercises : [],
     };
   };
 
-  const loadWorkouts = async () => {
+  const loadRoutines = async () => {
     try {
       if (!userId) {
         notify('Perfil do usuário não carregado.', 'warning');
         return;
       }
       setLoading(true);
-      const data = await fetchJson(`${apiBaseUrl}/api/workouts/templates?userId=${userId}`);
+      const response = await fetch(`${apiBaseUrl}/api/workout/routines?userId=${userId}`);
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data?.error || 'Não foi possível carregar os treinos.');
+      }
       const raw = Array.isArray(data) ? data : data?.items || [];
-      const normalized = raw.map(normalizeWorkoutFromApi);
-      setWorkouts(normalized);
+      const normalized = raw.map(normalizeRoutineFromApi);
+      setRoutines(normalized);
     } catch (err) {
-      console.error('Erro ao carregar treinos', err);
+      console.error('Erro ao carregar rotinas', err);
       notify('Não foi possível carregar os treinos.');
     } finally {
       setLoading(false);
@@ -541,7 +546,7 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', pushToast }) => 
     setViewWorkout(null);
   };
 
-  const handleSaveWorkout = async () => {
+  const handleSaveRoutine = async () => {
     if (!workoutForm.name.trim()) {
       notify('Informe o nome do treino.', 'warning');
       return;
@@ -551,32 +556,45 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', pushToast }) => 
       return;
     }
 
+    const payload = {
+      userId,
+      name: workoutForm.name,
+      muscleGroups: workoutForm.muscleGroups,
+      sportsActivities: workoutForm.sportsActivities,
+    };
+
     try {
       setLoading(true);
-      const payload = {
-        ...workoutForm,
-        exercises: workoutForm.exercises,
-        sportsActivities: workoutForm.sportsActivities,
-        sports: workoutForm.sportsActivities,
-        userId,
-      };
-      const url = workoutForm.id
-        ? `${apiBaseUrl}/api/workouts/templates/${workoutForm.id}`
-        : `${apiBaseUrl}/api/workouts/templates`;
-      const method = workoutForm.id ? 'PUT' : 'POST';
-      const saved = await fetchJson(url, {
-        method,
-        body: JSON.stringify(payload),
-      });
-      setWorkoutForm({ id: null, name: '', muscleGroups: [], sportsActivities: [], exercises: [] });
-      if (saved && saved.id) {
-        setWorkouts((prev) => {
-          const others = prev.filter((w) => w.id !== saved.id);
-          return [normalizeWorkoutFromApi(saved), ...others];
+      let response;
+      if (workoutForm.id) {
+        response = await fetch(`${apiBaseUrl}/api/workout/routines/${workoutForm.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
         });
       } else {
-        await loadWorkouts();
+        response = await fetch(`${apiBaseUrl}/api/workout/routines`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
       }
+
+      const saved = await response.json();
+
+      if (!response.ok) {
+        throw new Error(saved?.error || 'Não foi possível salvar o treino.');
+      }
+
+      setWorkoutForm({ id: null, name: '', muscleGroups: [], sportsActivities: [], exercises: [] });
+
+      setRoutines((prev) => {
+        if (workoutForm.id) {
+          return prev.map((routine) => (routine.id === saved.id ? normalizeRoutineFromApi(saved) : routine));
+        }
+        return [...prev, normalizeRoutineFromApi(saved)];
+      });
+
       if (createReminder) {
         const reminderPayload = {
           type: 'workout',
@@ -588,6 +606,7 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', pushToast }) => 
           body: JSON.stringify(reminderPayload),
         });
       }
+
       notify('Treino salvo com sucesso!', 'success');
     } catch (err) {
       console.warn('Erro ao salvar treino', err);
@@ -597,20 +616,17 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', pushToast }) => 
     }
   };
 
-  const handleDeleteWorkout = async (id) => {
+  const handleDeleteRoutine = async (id) => {
     if (!window.confirm('Tem certeza que deseja excluir este treino?')) return;
 
     try {
-      const response = await fetch(`${apiBaseUrl}/api/workouts/templates/${id}`, {
-        method: 'DELETE',
-      });
+      const response = await fetch(`${apiBaseUrl}/api/workout/routines/${id}`, { method: 'DELETE' });
 
       if (!response.ok) {
-        console.error('Falha ao excluir treino');
-        return;
+        throw new Error('Não foi possível excluir o treino.');
       }
 
-      setWorkouts((prev) => prev.filter((tpl) => tpl.id !== id));
+      setRoutines((prev) => prev.filter((tpl) => tpl.id !== id));
       setSchedule((prev) =>
         prev.map((slot) => (slot.workout_id === id ? { ...slot, workout_id: '' } : slot))
       );
@@ -749,7 +765,7 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', pushToast }) => 
 
   useEffect(() => {
     if (!userId) return;
-    loadWorkouts();
+    loadRoutines();
     loadSchedule();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId]);
@@ -895,7 +911,7 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', pushToast }) => 
                 Limpar edição
               </button>
               <div className="row" style={{ gap: 8 }}>
-                <button className="primary" onClick={handleSaveWorkout} disabled={loading}>
+                <button className="primary" onClick={handleSaveRoutine} disabled={loading}>
                   {loading ? 'Salvando...' : workoutForm.id ? 'Atualizar template' : 'Salvar template'}
                 </button>
               </div>
@@ -905,10 +921,10 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', pushToast }) => 
           {/* TREINOS CADASTRADOS */}
           <div>
             <h4 className="title" style={{ marginBottom: 12 }}>Treinos cadastrados</h4>
-            {!workouts.length && <div className="muted">Nenhum treino cadastrado.</div>}
-            {workouts.length > 0 && (
+            {!routines.length && <div className="muted">Nenhum treino cadastrado.</div>}
+            {routines.length > 0 && (
               <div className="table">
-                {workouts.map((template) => (
+                {routines.map((template) => (
                   <div
                     key={template.id || template.name}
                     className="workout-template-item table-row"
@@ -951,7 +967,7 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', pushToast }) => 
                       <button
                         type="button"
                         className="ghost small btn-danger-outline"
-                        onClick={() => handleDeleteWorkout(template.id)}
+                        onClick={() => handleDeleteRoutine(template.id)}
                       >
                         Excluir
                       </button>
@@ -1035,7 +1051,7 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', pushToast }) => 
                       }}
                     >
                       <option value="">Selecione um treino</option>
-                      {workouts.map((item) => (
+                      {routines.map((item) => (
                         <option key={item.id || item.name} value={item.id}>
                           {item.name}
                         </option>
@@ -1135,12 +1151,12 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', pushToast }) => 
               <button
                 className="primary"
                 onClick={handleSaveSchedule}
-                disabled={savingSchedule || !hasWorkouts}
+                disabled={savingSchedule || !hasRoutines}
               >
                 {savingSchedule ? 'Salvando...' : 'Salvar semana de treino'}
               </button>
             </div>
-            {!hasWorkouts && (
+            {!hasRoutines && (
               <div className="muted" style={{ marginTop: 8, fontSize: 13 }}>
                 Cadastre ao menos um treino para montar a semana.
               </div>
