@@ -361,12 +361,24 @@ app.post("/workout-schedule", async (req, res) => {
 // Todas agrupadas em /api/workouts para não conflitar com fluxos já existentes.
 app.post("/api/workouts/templates", async (req, res) => {
   try {
-    const { userId, name, muscleGroups = [], exercises = [], muscle_groups } = req.body || {};
+    const {
+      userId,
+      name,
+      muscleGroups = [],
+      exercises = [],
+      muscle_groups,
+      sportsActivities = [],
+      sports = [],
+    } = req.body || {};
     const normalizedMuscleGroups = Array.isArray(muscleGroups)
       ? muscleGroups
       : typeof muscle_groups === "string"
       ? muscle_groups.split(",").map((item) => item.trim()).filter(Boolean)
       : [];
+
+    const normalizedSports = normalizeSportsArray(
+      Array.isArray(sportsActivities) && sportsActivities.length ? sportsActivities : sports
+    );
 
     if (!userId || !name || !normalizedMuscleGroups.length) {
       return res.status(400).json({
@@ -378,6 +390,8 @@ app.post("/api/workouts/templates", async (req, res) => {
       userId,
       name,
       muscleGroups: normalizedMuscleGroups,
+      sportsActivities: normalizedSports,
+      sports: normalizedSports,
       exercises: Array.isArray(exercises) ? exercises : [],
     };
 
@@ -392,12 +406,24 @@ app.post("/api/workouts/templates", async (req, res) => {
 app.put("/api/workouts/templates/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const { userId, name, muscleGroups = [], exercises = [], muscle_groups } = req.body || {};
+    const {
+      userId,
+      name,
+      muscleGroups = [],
+      exercises = [],
+      muscle_groups,
+      sportsActivities = [],
+      sports = [],
+    } = req.body || {};
     const normalizedMuscleGroups = Array.isArray(muscleGroups)
       ? muscleGroups
       : typeof muscle_groups === "string"
       ? muscle_groups.split(",").map((item) => item.trim()).filter(Boolean)
       : [];
+
+    const normalizedSports = normalizeSportsArray(
+      Array.isArray(sportsActivities) && sportsActivities.length ? sportsActivities : sports
+    );
 
     if (!id || !userId || !name || !normalizedMuscleGroups.length) {
       return res.status(400).json({
@@ -410,6 +436,8 @@ app.put("/api/workouts/templates/:id", async (req, res) => {
       userId,
       name,
       muscleGroups: normalizedMuscleGroups,
+      sportsActivities: normalizedSports,
+      sports: normalizedSports,
       exercises: Array.isArray(exercises) ? exercises : [],
     };
 
