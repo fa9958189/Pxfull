@@ -139,6 +139,25 @@ const getUserIdFromRequest = (req) =>
   req.headers["x-user-id"] ||
   req.headers["user-id"];
 
+const parseList = (value) =>
+  value
+    ? String(value)
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean)
+    : [];
+
+const joinList = (value) =>
+  Array.isArray(value) ? value.map((item) => String(item).trim()).filter(Boolean).join(", ") : "";
+
+const mapRoutineRow = (row = {}) => ({
+  id: row.id,
+  name: row.name,
+  muscleGroups: parseList(row.muscle_group),
+  sportsActivities: parseList(row.sports_list || row.sports),
+  createdAt: row.created_at,
+});
+
 const normalizeMuscleGroups = (muscleGroups) => {
   if (Array.isArray(muscleGroups)) return muscleGroups.join(",");
   if (typeof muscleGroups === "string") return muscleGroups;
@@ -187,91 +206,109 @@ const normalizeSportsString = (sports) => {
   return "";
 };
 
-// GET /workout-routines
-app.get("/workout-routines", async (req, res) => {
+// CRUD de rotinas de treino (tabela workout_routines)
+app.get("/api/workout/routines", async (req, res) => {
   try {
     const userId = getUserIdFromRequest(req);
     if (!userId) {
-      return res.status(400).json({ error: "user_id é obrigatório." });
+      return res.status(400).json({ error: "userId é obrigatório" });
     }
 
     const { data, error } = await supabase
       .from("workout_routines")
-      .select("id, user_id, name, muscle_groups, sports, sports_list, created_at")
+      .select("id, user_id, name, muscle_group, sports, sports_list, created_at")
       .eq("user_id", userId)
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: true });
 
     if (error) {
-      console.error("Erro ao buscar treinos:", error);
+      console.error("Erro ao buscar rotinas de treino:", error);
       return res.status(400).json({ error: error.message });
     }
 
-    const normalized = (data || []).map((item) => {
-      const sports = normalizeSportsArray(item.sports ?? item.sports_list);
-      return { ...item, sports };
-    });
-
-    return res.json(normalized);
+    const routines = (data || []).map(mapRoutineRow);
+    return res.json(routines);
   } catch (err) {
-    console.error("Erro inesperado em GET /workout-routines:", err);
+    console.error("Erro inesperado em GET /api/workout/routines:", err);
     return res.status(500).json({ error: "Erro interno no servidor" });
   }
 });
 
-// POST /workout-routines
-app.post("/workout-routines", async (req, res) => {
+app.post("/api/workout/routines", async (req, res) => {
   try {
-    const userId = getUserIdFromRequest(req);
-    const { name, muscleGroups, sports } = req.body || {};
-
+    const { userId, name, muscleGroups = [], sportsActivities = [] } = req.body || {};
     if (!userId || !name) {
-      return res.status(400).json({ error: "user_id e name são obrigatórios." });
+      return res.status(400).json({ error: "userId e name são obrigatórios" });
     }
-
-    const muscle_groups = normalizeMuscleGroups(muscleGroups);
-    if (!muscle_groups) {
-      return res
-        .status(400)
-        .json({ error: "muscleGroups é obrigatório (array ou string)." });
-    }
-
-    const sportsArray = normalizeSportsArray(sports);
-    const sports_list = normalizeSportsString(sportsArray);
 
     const insertPayload = {
       user_id: userId,
       name,
-      muscle_groups,
-      sports: sportsArray,
-      sports_list,
+      muscle_group: joinList(muscleGroups),
+      sports: joinList(sportsActivities),
+      sports_list: joinList(sportsActivities),
     };
 
     const { data, error } = await supabase
       .from("workout_routines")
       .insert(insertPayload)
-      .select()
+      .select("id, user_id, name, muscle_group, sports, sports_list, created_at")
       .single();
 
     if (error) {
-      console.error("Erro ao criar treino:", error);
+      console.error("Erro ao criar rotina de treino:", error);
       return res.status(400).json({ error: error.message });
     }
 
-    return res.json({ ...data, sports: normalizeSportsArray(data?.sports ?? data?.sports_list) });
+    return res.json(mapRoutineRow(data));
   } catch (err) {
-    console.error("Erro inesperado em POST /workout-routines:", err);
+    console.error("Erro inesperado em POST /api/workout/routines:", err);
     return res.status(500).json({ error: "Erro interno no servidor" });
   }
 });
 
-// DELETE /workout-routines/:id
-app.delete("/workout-routines/:id", async (req, res) => {
+app.put("/api/workout/routines/:id", async (req, res) => {
   try {
-    const userId = getUserIdFromRequest(req);
     const { id } = req.params;
+    const { userId, name, muscleGroups = [], sportsActivities = [] } = req.body || {};
 
-    if (!userId || !id) {
-      return res.status(400).json({ error: "user_id e id são obrigatórios." });
+    if (!id || !userId || !name) {
+      return res.status(400).json({ error: "id, userId e name são obrigatórios" });
+    }
+
+    const updatePayload = {
+      name,
+      muscle_group: joinList(muscleGroups),
+      sports: joinList(sportsActivities),
+      sports_list: joinList(sportsActivities),
+    };
+
+    const { data, error } = await supabase
+      .from("workout_routines")
+      .update(updatePayload)
+      .eq("id", id)
+      .eq("user_id", userId)
+      .select("id, user_id, name, muscle_group, sports, sports_list, created_at")
+      .single();
+
+    if (error) {
+      console.error("Erro ao atualizar rotina de treino:", error);
+      return res.status(400).json({ error: error.message });
+    }
+
+    return res.json(mapRoutineRow(data));
+  } catch (err) {
+    console.error("Erro inesperado em PUT /api/workout/routines/:id:", err);
+    return res.status(500).json({ error: "Erro interno no servidor" });
+  }
+});
+
+app.delete("/api/workout/routines/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = getUserIdFromRequest(req);
+
+    if (!id || !userId) {
+      return res.status(400).json({ error: "id e userId são obrigatórios" });
     }
 
     const { error: scheduleError } = await supabase
@@ -281,7 +318,7 @@ app.delete("/workout-routines/:id", async (req, res) => {
       .eq("user_id", userId);
 
     if (scheduleError) {
-      console.error("Erro ao limpar agenda de treino:", scheduleError);
+      console.error("Erro ao limpar agendamentos da rotina:", scheduleError);
       return res.status(400).json({ error: scheduleError.message });
     }
 
@@ -292,13 +329,13 @@ app.delete("/workout-routines/:id", async (req, res) => {
       .eq("user_id", userId);
 
     if (error) {
-      console.error("Erro ao excluir treino:", error);
+      console.error("Erro ao excluir rotina de treino:", error);
       return res.status(400).json({ error: error.message });
     }
 
     return res.json({ success: true });
   } catch (err) {
-    console.error("Erro inesperado em DELETE /workout-routines/:id:", err);
+    console.error("Erro inesperado em DELETE /api/workout/routines/:id:", err);
     return res.status(500).json({ error: "Erro interno no servidor" });
   }
 });
