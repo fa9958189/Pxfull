@@ -102,16 +102,47 @@ const saveSessionToSupabase = async (session) => {
 
 const saveReminderToSupabase = async (reminder) => {
   try {
+    // Monta o objeto exatamente com os nomes das colunas do banco
+    const payload = {
+      id: reminder.id || undefined, // deixa o Postgres gerar se vier undefined
+      user_id: reminder.userId || null,
+      type: reminder.type || "workout",
+      workout_name:
+        reminder.workoutName || reminder.workout_name || null,
+      date: reminder.date || null,
+      created_at: reminder.created_at || new Date().toISOString(),
+    };
+
+    // Garantir que não vamos violar o NOT NULL de workout_name
+    if (!payload.workout_name) {
+      throw new Error(
+        "workout_name é obrigatório para salvar em workout_reminders"
+      );
+    }
+
     const { data, error } = await supabase
       .from("workout_reminders")
-      .insert(reminder)
-      .select()
+      .insert(payload)
+      .select("*")
       .single();
 
     if (error) throw error;
-    return data;
+
+    // Normaliza o objeto que o resto da API usa
+    return {
+      ...reminder,
+      id: data.id,
+      userId: data.user_id,
+      workoutName: data.workout_name,
+      date: data.date,
+      created_at: data.created_at,
+      type: data.type,
+    };
   } catch (err) {
-    console.warn("Supabase indisponível para lembretes, fallback para JSON:", err);
+    console.warn(
+      "Supabase indisponível para lembretes, fallback para JSON:",
+      err
+    );
     return null;
   }
 };
