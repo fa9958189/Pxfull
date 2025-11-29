@@ -40,6 +40,34 @@ const generateId = () => crypto.randomUUID();
 
 const supabaseAvailable = Boolean(supabase);
 
+const normalizeSportsArray = (sports) => {
+  if (Array.isArray(sports)) {
+    return sports.map((s) => String(s).trim()).filter(Boolean);
+  }
+
+  if (typeof sports === "string") {
+    const trimmed = sports.trim();
+
+    if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (Array.isArray(parsed)) {
+          return parsed.map((s) => String(s).trim()).filter(Boolean);
+        }
+      } catch (err) {
+        // fallback para tratamento comum
+      }
+    }
+
+    return trimmed
+      .split(",")
+      .map((s) => String(s).replace(/^\[|\]$/g, "").replace(/^"|"$/g, "").trim())
+      .filter(Boolean);
+  }
+
+  return [];
+};
+
 const saveTemplateToSupabase = async (template) => {
   try {
     const { data, error } = await supabase
@@ -163,9 +191,15 @@ export const upsertWorkoutTemplate = async (template) => {
 
 export const createWorkoutSession = async (session) => {
   const now = new Date().toISOString();
+  const sportsActivities = normalizeSportsArray(
+    session.sportsActivities ?? session.sports ?? session.sports_activities
+  );
   const payload = {
     ...session,
     id: session.id || generateId(),
+    sportsActivities,
+    sports: sportsActivities,
+    sports_activities: sportsActivities,
     createdAt: session.createdAt || now,
   };
 
@@ -196,7 +230,14 @@ export const listWorkoutSessions = async (userId, { from, to }) => {
 
       const { data, error } = await query;
       if (error) throw error;
-      if (Array.isArray(data) && data.length) return data;
+      if (Array.isArray(data) && data.length) {
+        return data.map((item) => ({
+          ...item,
+          sportsActivities: normalizeSportsArray(
+            item.sportsActivities ?? item.sports ?? item.sports_activities
+          ),
+        }));
+      }
     } catch (err) {
       console.warn("Supabase indisponível para listagem de sessões, fallback para JSON:", err);
     }
@@ -210,6 +251,12 @@ export const listWorkoutSessions = async (userId, { from, to }) => {
       if (to && item.date > to) return false;
       return true;
     })
+    .map((item) => ({
+      ...item,
+      sportsActivities: normalizeSportsArray(
+        item.sportsActivities ?? item.sports ?? item.sports_activities
+      ),
+    }))
     .sort((a, b) => (a.date < b.date ? 1 : -1));
 };
 
