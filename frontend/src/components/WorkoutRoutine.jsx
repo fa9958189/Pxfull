@@ -138,6 +138,7 @@ const ViewWorkoutModal = ({
   open,
   workout,
   onClose,
+  onCompleteToday,
   muscleMap,
   sportsMap,
   restDuration,
@@ -277,6 +278,15 @@ const ViewWorkoutModal = ({
                 onChangeDuration={onChangeDuration}
                 onStart={onStart}
               />
+            </div>
+            <div className="complete-today-wrapper" style={{ marginTop: 12 }}>
+              <button
+                type="button"
+                className="primary"
+                onClick={() => onCompleteToday?.(workout)}
+              >
+                Concluir treino de hoje
+              </button>
             </div>
           </div>
         </section>
@@ -442,7 +452,26 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', pushToast }) => 
       if (historyRange.from) query.append('from', historyRange.from);
       if (historyRange.to) query.append('to', historyRange.to);
       const data = await fetchJson(`${apiBaseUrl}/api/workouts/sessions?${query.toString()}`);
-      setSessions(Array.isArray(data) ? data : []);
+      const raw = Array.isArray(data) ? data : data?.items || [];
+      const normalized = raw.map((session) => {
+        const normalizedSports = syncSportsFromTemplate(
+          session.sportsActivities,
+          session.sports || session.sports_activities
+        );
+
+        const normalizedGroups = Array.isArray(session.muscleGroups)
+          ? session.muscleGroups
+          : typeof session.muscle_groups === 'string'
+            ? session.muscle_groups.split(',').map((g) => g.trim()).filter(Boolean)
+            : [];
+
+        return {
+          ...session,
+          muscleGroups: normalizedGroups,
+          sportsActivities: normalizedSports,
+        };
+      });
+      setSessions(normalized);
     } catch (err) {
       console.error('Erro ao carregar histórico', err);
       notify('Não foi possível carregar o histórico de treinos.');
@@ -613,20 +642,28 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', pushToast }) => 
     }
   };
 
-  const handleCompleteTodayWorkout = async () => {
-    if (!workoutForm.name) {
+  const completeWorkoutSession = async (template) => {
+    const source = template || workoutForm;
+    if (!source?.name) {
       notify('Selecione um treino para concluir.', 'warning');
-      return;
+      return null;
     }
+
+    const sportsActivities = syncSportsFromTemplate(
+      source.sportsActivities,
+      source.sports || source.sports_activities
+    );
+
     const sessionPayload = {
       userId,
-      templateId: workoutForm.id || null,
+      templateId: source.id || null,
       date: new Date().toISOString().slice(0, 10),
-      name: workoutForm.name,
-      muscleGroups: workoutForm.muscleGroups,
-      sportsActivities: workoutForm.sportsActivities,
-      sports: workoutForm.sportsActivities,
-      exercises: workoutForm.exercises.map((ex) => ({
+      name: source.name,
+      muscleGroups: source.muscleGroups || source.muscle_groups || [],
+      sportsActivities,
+      sports: sportsActivities,
+      sports_activities: sportsActivities,
+      exercises: (source.exercises || []).map((ex) => ({
         ...ex,
         completed: true,
       })),
@@ -638,12 +675,26 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', pushToast }) => 
         method: 'POST',
         body: JSON.stringify(sessionPayload),
       });
-      setSessions((prev) => [saved, ...prev]);
+
+      const normalizedSaved = {
+        ...saved,
+        muscleGroups: Array.isArray(saved?.muscleGroups)
+          ? saved.muscleGroups
+          : Array.isArray(source.muscleGroups)
+            ? source.muscleGroups
+            : [],
+        sportsActivities: syncSportsFromTemplate(
+          saved?.sportsActivities,
+          saved?.sports || saved?.sports_activities || sportsActivities
+        ),
+      };
+
+      setSessions((prev) => [normalizedSaved, ...prev]);
       if (sessionReminder) {
         const reminderPayload = {
           type: 'workout',
-          workoutName: saved?.name || workoutForm.name,
-          date: saved?.date || sessionPayload.date,
+          workoutName: normalizedSaved?.name || source.name,
+          date: normalizedSaved?.date || sessionPayload.date,
         };
         await fetchJson(`${apiBaseUrl}/api/workouts/reminders`, {
           method: 'POST',
@@ -651,9 +702,22 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', pushToast }) => 
         });
       }
       notify('Treino de hoje concluído!', 'success');
+      return normalizedSaved;
     } catch (err) {
       console.error('Erro ao concluir treino', err);
       notify('Não foi possível registrar o treino de hoje.', 'danger');
+      return null;
+    }
+  };
+
+  const handleCompleteTodayWorkout = async () => {
+    await completeWorkoutSession(workoutForm);
+  };
+
+  const handleCompleteFromModal = async (template) => {
+    const saved = await completeWorkoutSession(template);
+    if (saved) {
+      handleCloseViewWorkout();
     }
   };
 
@@ -831,9 +895,6 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', pushToast }) => 
                 Limpar edição
               </button>
               <div className="row" style={{ gap: 8 }}>
-                <button className="ghost" onClick={handleCompleteTodayWorkout} disabled={!workoutForm.name}>
-                  Concluir treino de hoje
-                </button>
                 <button className="primary" onClick={handleSaveWorkout} disabled={loading}>
                   {loading ? 'Salvando...' : workoutForm.id ? 'Atualizar template' : 'Salvar template'}
                 </button>
@@ -1122,6 +1183,14 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', pushToast }) => 
                     <div className="muted" style={{ fontSize: 13 }}>
                       {(session.muscleGroups || []).map((g) => muscleMap[g]?.label || g).join(', ')}
                     </div>
+                    {Array.isArray(session.sportsActivities) && session.sportsActivities.length > 0 && (
+                      <div className="muted" style={{ fontSize: 13 }}>
+                        Esportes/atividades:{' '}
+                        {session.sportsActivities
+                          .map((sport) => sportsMap[sport]?.label || sport)
+                          .join(', ')}
+                      </div>
+                    )}
                     <div className="muted" style={{ fontSize: 12 }}>
                       {(session.exercises || []).map(formatExerciseResume).join('; ')}
                     </div>
@@ -1202,6 +1271,7 @@ const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', pushToast }) => 
         open={isViewModalOpen}
         workout={viewWorkout}
         onClose={handleCloseViewWorkout}
+        onCompleteToday={handleCompleteFromModal}
         muscleMap={muscleMap}
         sportsMap={sportsMap}
         restDuration={restDuration}
