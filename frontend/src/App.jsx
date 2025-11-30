@@ -562,7 +562,7 @@ function App() {
   const [eventFilters, setEventFilters] = useState(defaultEventFilters);
   const [activeTab, setActiveTab] = useState('form');
   const [activeView, setActiveView] = useState('transactions');
-  const workoutApiBase = window.APP_CONFIG?.apiBaseUrl || 'http://192.168.11.190:3001';
+  const workoutApiBase = window.APP_CONFIG?.apiBaseUrl || import.meta.env.VITE_API_BASE_URL;
 
   const [toast, setToast] = useState(null);
   const [loadingData, setLoadingData] = useState(false);
@@ -924,7 +924,7 @@ function App() {
         if (error) throw error;
       } else {
         // Criar usuário via backend
-        const response = await fetch('http://192.168.11.190:3001/create-user', {
+        const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/create-user`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
