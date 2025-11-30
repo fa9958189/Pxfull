@@ -1,0 +1,13 @@
+{
+  "name": "pxfull",
+  "version": "1.0.0",
+  "description": "Ferramentas auxiliares para a SPA em React que consome o Supabase diretamente pelo browser.",
+  "main": "index.js",
+  "scripts": {
+    "db:print": "node scripts/print-db-connection.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs"
+}
