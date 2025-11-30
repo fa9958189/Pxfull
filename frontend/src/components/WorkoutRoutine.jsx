@@ -295,7 +295,7 @@ const ViewWorkoutModal = ({
   );
 };
 
-const WorkoutRoutine = ({ apiBaseUrl = 'http://192.168.11.190:3001', pushToast }) => {
+const WorkoutRoutine = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL, pushToast }) => {
   const [activeTab, setActiveTab] = useState('config');
   const [workoutForm, setWorkoutForm] = useState({
     id: null,
