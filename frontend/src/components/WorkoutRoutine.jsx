@@ -295,7 +295,7 @@ const ViewWorkoutModal = ({
   );
 };
 
-const WorkoutRoutine = ({ apiBaseUrl = 'http://localhost:3001', pushToast }) => {
+const WorkoutRoutine = ({ apiBaseUrl = 'http://192.168.11.190:3001', pushToast }) => {
   const [activeTab, setActiveTab] = useState('config');
   const [workoutForm, setWorkoutForm] = useState({
     id: null,
