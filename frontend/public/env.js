@@ -1,4 +1,3 @@
-// Configuração do Supabase e API para a SPA em React
 window.APP_CONFIG = window.APP_CONFIG || {};
 
 window.APP_CONFIG.supabaseUrl =
@@ -11,6 +10,6 @@ window.APP_CONFIG.supabaseAnonKey =
 window.APP_CONFIG.authSchema =
   window.APP_CONFIG.authSchema || 'public';
 
-// URL do backend Node/Express
+// URL do backend Node/Express – sempre localhost
 window.APP_CONFIG.apiBaseUrl =
-  window.APP_CONFIG.apiBaseUrl || import.meta.env.VITE_API_BASE_URL;
+  window.APP_CONFIG.apiBaseUrl || 'http://localhost:3001';
