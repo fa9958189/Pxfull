@@ -86,16 +86,43 @@ const saveTemplateToSupabase = async (template) => {
 
 const saveSessionToSupabase = async (session) => {
   try {
+    const row = {
+      id: session.id,
+      user_id: session.userId,
+      workout_name: session.workoutName || session.name || "",
+      muscle_groups: Array.isArray(session.muscleGroups)
+        ? session.muscleGroups.join(", ")
+        : "",
+      sports_list: Array.isArray(session.sports)
+        ? session.sports.join(", ")
+        : "",
+      performed_at: session.date ?? new Date().toISOString(),
+    };
+
     const { data, error } = await supabase
       .from("workout_sessions")
-      .upsert(session)
-      .select()
+      .insert(row)
+      .select(
+        "id, user_id, workout_name, muscle_groups, sports_list, performed_at"
+      )
       .single();
 
     if (error) throw error;
-    return data;
-  } catch (err) {
-    console.warn("Supabase indisponível para sessões, fallback para JSON:", err);
+
+    return {
+      id: data.id,
+      userId: data.user_id,
+      workoutName: data.workout_name,
+      muscleGroups: data.muscle_groups
+        ? data.muscle_groups.split(",").map((s) => s.trim())
+        : [],
+      sports: data.sports_list
+        ? data.sports_list.split(",").map((s) => s.trim())
+        : [],
+      date: data.performed_at,
+    };
+  } catch (error) {
+    console.error("Erro ao salvar sessão no Supabase, usando JSON:", error);
     return null;
   }
 };
@@ -252,25 +279,36 @@ export const listWorkoutSessions = async (userId, { from, to }) => {
     try {
       let query = supabase
         .from("workout_sessions")
-        .select("*")
-        .eq("userId", userId)
-        .order("date", { ascending: false });
+        .select(
+          "id, user_id, workout_name, muscle_groups, sports_list, performed_at"
+        )
+        .eq("user_id", userId)
+        .order("performed_at", { ascending: false });
 
-      if (from) query = query.gte("date", from);
-      if (to) query = query.lte("date", to);
+      if (from) query = query.gte("performed_at", from);
+      if (to) query = query.lte("performed_at", to);
 
       const { data, error } = await query;
+
       if (error) throw error;
-      if (Array.isArray(data) && data.length) {
-        return data.map((item) => ({
-          ...item,
-          sportsActivities: normalizeSportsArray(
-            item.sportsActivities ?? item.sports ?? item.sports_activities
-          ),
-        }));
-      }
-    } catch (err) {
-      console.warn("Supabase indisponível para listagem de sessões, fallback para JSON:", err);
+
+      return (data || []).map((row) => ({
+        id: row.id,
+        userId: row.user_id,
+        workoutName: row.workout_name,
+        muscleGroups: row.muscle_groups
+          ? row.muscle_groups.split(",").map((s) => s.trim())
+          : [],
+        sports: row.sports_list
+          ? row.sports_list.split(",").map((s) => s.trim())
+          : [],
+        date: row.performed_at,
+      }));
+    } catch (error) {
+      console.error(
+        "Supabase indisponível para sessões, fallback para JSON:",
+        error
+      );
     }
   }
 
