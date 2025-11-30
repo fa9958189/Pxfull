@@ -13,4 +13,4 @@ window.APP_CONFIG.authSchema =
 
 // URL do backend Node/Express
 window.APP_CONFIG.apiBaseUrl =
-  window.APP_CONFIG.apiBaseUrl || 'http://192.168.11.190:3001';
+  window.APP_CONFIG.apiBaseUrl || import.meta.env.VITE_API_BASE_URL;
