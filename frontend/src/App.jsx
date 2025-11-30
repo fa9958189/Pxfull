@@ -582,7 +582,7 @@ function App() {
                     // 1) Transações do usuário logado
                     let txQuery = client
                       .from('transactions')
-                      .select('*')
+                      .select('id, user_id, type, amount, description, category, date, created_at')
                       .eq('user_id', session.user.id)
                       .order('date', { ascending: false });
 
@@ -606,6 +606,18 @@ function App() {
                     const { data: txData, error: txError } = await txQuery;
                     if (txError) throw txError;
 
+                    const normalizedTx = (txData || []).map((row) => ({
+                      id: row.id,
+                      user_id: row.user_id,
+                      userId: row.user_id,
+                      type: row.type,
+                      amount: row.amount,
+                      description: row.description,
+                      category: row.category,
+                      date: row.date,
+                      createdAt: row.created_at,
+                    }));
+
                     // 2) Eventos (agenda) do usuário logado
                     const { data: eventData, error: evError } = await client
                       .from('events')
@@ -628,13 +640,13 @@ function App() {
                     }
 
                     // Atualiza estados
-                    setTransactions(txData || []);
+                    setTransactions(normalizedTx);
                     setEvents(eventData || []);
                     setUsers(userData);
 
                     // Salva snapshot local
                     persistLocalSnapshot({
-                      transactions: txData || [],
+                      transactions: normalizedTx,
                       events: eventData || [],
                     });
 
@@ -658,8 +670,15 @@ function App() {
   useEffect(() => {
     if (!session) return;
     const snapshot = getLocalSnapshot();
-    const belongsToUser = (item) => item.user_id === session.user.id;
-    setTransactions((snapshot.transactions || []).filter(belongsToUser));
+    const belongsToUser = (item) => item.user_id === session.user.id || item.userId === session.user.id;
+    const normalizedLocalTx = (snapshot.transactions || [])
+      .filter(belongsToUser)
+      .map((item) => ({
+        ...item,
+        user_id: item.user_id || item.userId,
+        userId: item.userId || item.user_id,
+      }));
+    setTransactions(normalizedLocalTx);
     setEvents((snapshot.events || []).filter(belongsToUser));
   }, [session]);
 
@@ -671,7 +690,8 @@ function App() {
 
   const filteredTransactions = useMemo(() => {
     return transactions.filter((tx) => {
-      if (session && tx.user_id && tx.user_id !== session.user.id) return false;
+      const ownerId = tx.userId || tx.user_id;
+      if (session && ownerId && ownerId !== session.user.id) return false;
       if (txFilters.type && tx.type !== txFilters.type) return false;
       if (txFilters.from && tx.date < txFilters.from) return false;
       if (txFilters.to && tx.date > txFilters.to) return false;
@@ -792,6 +812,7 @@ function App() {
                             id: txForm.id || randomId(),
                             amount: Number(txForm.amount || 0),
                             user_id: session?.user?.id ?? null,
+                            userId: session?.user?.id ?? null,
                           };
 
                           // Atualiza estado/localStorage primeiro (funciona mesmo sem Supabase)
