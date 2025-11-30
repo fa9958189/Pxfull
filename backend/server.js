@@ -153,7 +153,7 @@ const joinList = (value) =>
 const mapRoutineRow = (row = {}) => ({
   id: row.id,
   name: row.name,
-  muscleGroups: parseList(row.muscle_group),
+  muscleGroups: parseList(row.muscle_groups || row.muscle_group),
   sportsActivities: parseList(row.sports_list || row.sports),
   createdAt: row.created_at,
 });
@@ -244,6 +244,7 @@ app.post("/api/workout/routines", async (req, res) => {
       user_id: userId,
       name,
       muscle_group: joinList(muscleGroups),
+      muscle_groups: joinList(muscleGroups),
       sports: joinList(sportsActivities),
       sports_list: joinList(sportsActivities),
     };
@@ -278,6 +279,7 @@ app.put("/api/workout/routines/:id", async (req, res) => {
     const updatePayload = {
       name,
       muscle_group: joinList(muscleGroups),
+      muscle_groups: joinList(muscleGroups),
       sports: joinList(sportsActivities),
       sports_list: joinList(sportsActivities),
     };
