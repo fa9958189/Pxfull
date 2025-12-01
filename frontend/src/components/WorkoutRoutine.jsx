@@ -886,36 +886,10 @@ const WorkoutRoutine = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL, pushTo
                 })}
               </div>
 
-              <div className="row" style={{ gap: 12, alignItems: 'center', marginTop: 10 }}>
-                <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                  <input
-                    type="checkbox"
-                    checked={createReminder}
-                    onChange={(e) => setCreateReminder(e.target.checked)}
-                  />
-                  Criar lembrete para este treino
-                </label>
-                <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                  <input
-                    type="checkbox"
-                    checked={sessionReminder}
-                    onChange={(e) => setSessionReminder(e.target.checked)}
-                  />
-                  Criar lembrete ao concluir
-                </label>
-              </div>
-
               <div className="row" style={{ justifyContent: 'space-between', marginTop: 12 }}>
-                <button
-                  className="ghost"
-                  disabled={!workoutForm.id}
-                  onClick={() => setWorkoutForm({ id: null, name: '', muscleGroups: [], sportsActivities: [], exercises: [] })}
-                >
-                  Limpar edição
-                </button>
                 <div className="row" style={{ gap: 8 }}>
                   <button className="primary" onClick={handleSaveRoutine} disabled={loading}>
-                    {loading ? 'Salvando...' : workoutForm.id ? 'Atualizar template' : 'Salvar template'}
+                    {loading ? 'Salvando...' : workoutForm.id ? 'Cadastrar treino' : 'Salvar template'}
                   </button>
                 </div>
               </div>
