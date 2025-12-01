@@ -334,7 +334,15 @@ canvas{ background:transparent; }
   .admin-user-form .admin-user-actions button{
     width:100%;
   }
+
+  /* === Tabelas responsivas no mobile (Transações / Agenda / Usuários) === */
+  .dashboard-card table,
+  .admin-card table,
+  aside.card table{
+    min-width: 650px;
+  }
 }
+
 
 @media (max-width:520px){
   body{
@@ -452,13 +460,28 @@ canvas{ background:transparent; }
   width: 100%;
   margin-left: auto;
   margin-right: auto;
+
+  /* novo: layout em grid */
+  display: grid;
+  grid-template-columns: 1fr; /* padrão: uma coluna (mobile / telas menores) */
+  gap: 16px;
 }
 
+/* em telas grandes: Rotina de Treino + Semana de Treino lado a lado */
+@media (min-width: 1100px) {
+  .workout-card {
+    grid-template-columns: 1.2fr 0.8fr; /* parecido com Transações x Agenda */
+    align-items: flex-start;
+  }
+}
+
+/* já existia – continua igual, só fica depois */
 @media (max-width: 768px) {
   .workout-card .row {
     flex-wrap: wrap;
   }
 }
+
 
 /* esconde a agenda dentro da rotina de treino */
 .workout-schedule {
