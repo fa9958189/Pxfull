@@ -320,8 +320,7 @@ app.delete("/api/workout/routines/:id", async (req, res) => {
       .eq("user_id", userId);
 
     if (scheduleError) {
-      console.error("Erro ao limpar agendamentos da rotina:", scheduleError);
-      return res.status(400).json({ error: scheduleError.message });
+      throw scheduleError;
     }
 
     const { error } = await supabase
@@ -331,14 +330,15 @@ app.delete("/api/workout/routines/:id", async (req, res) => {
       .eq("user_id", userId);
 
     if (error) {
-      console.error("Erro ao excluir rotina de treino:", error);
-      return res.status(400).json({ error: error.message });
+      throw error;
     }
 
-    return res.json({ success: true });
+    return res.status(204).send();
   } catch (err) {
-    console.error("Erro inesperado em DELETE /api/workout/routines/:id:", err);
-    return res.status(500).json({ error: "Erro interno no servidor" });
+    console.error("Erro ao excluir rotina", err);
+    return res
+      .status(500)
+      .json({ error: "Não foi possível excluir o treino." });
   }
 });
 
