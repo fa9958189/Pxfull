@@ -1255,7 +1255,7 @@ function App() {
       )}
 
       {activeView === 'workout' && (
-        <div className="container">
+        <div className="container single-card">
           <div className="grid-agenda">
             <WorkoutRoutine
               apiBaseUrl={workoutApiBase}
