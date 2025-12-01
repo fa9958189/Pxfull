@@ -797,492 +797,516 @@ const WorkoutRoutine = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL, pushTo
   };
 
   return (
-    <section className="card" style={{ marginTop: 16 }}>
-      <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
-        <h3 className="title" style={{ margin: 0 }}>Rotina de Treino</h3>
-        <div className="muted" style={{ fontSize: 13 }}>
-          Monte templates detalhados, salve o histórico e acompanhe o progresso.
+    <div className="workout-card">
+      {/* COLUNA ESQUERDA – Rotina de Treino (aba + config + histórico + progresso) */}
+      <section className="card" style={{ marginTop: 16 }}>
+        <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+          <h3 className="title" style={{ margin: 0 }}>Rotina de Treino</h3>
+          <div className="muted" style={{ fontSize: 13 }}>
+            Monte templates detalhados, salve o histórico e acompanhe o progresso.
+          </div>
         </div>
-      </div>
 
-      <div className="sep" style={{ marginTop: 12 }}></div>
+        <div className="sep" style={{ marginTop: 12 }}></div>
 
-      <div className="row" style={{ gap: 12, margin: '10px 0 18px' }}>
-        <button
-          className={activeTab === 'config' ? 'primary' : 'ghost'}
-          onClick={() => setActiveTab('config')}
-        >
-          Configuração
-        </button>
-        <button
-          className={activeTab === 'history' ? 'primary' : 'ghost'}
-          onClick={() => setActiveTab('history')}
-        >
-          Histórico
-        </button>
-        <button
-          className={activeTab === 'progress' ? 'primary' : 'ghost'}
-          onClick={() => setActiveTab('progress')}
-        >
-          Progresso
-        </button>
-      </div>
+        <div className="row" style={{ gap: 12, margin: '10px 0 18px' }}>
+          <button
+            className={activeTab === 'config' ? 'primary' : 'ghost'}
+            onClick={() => setActiveTab('config')}
+          >
+            Configuração
+          </button>
+          <button
+            className={activeTab === 'history' ? 'primary' : 'ghost'}
+            onClick={() => setActiveTab('history')}
+          >
+            Histórico
+          </button>
+          <button
+            className={activeTab === 'progress' ? 'primary' : 'ghost'}
+            onClick={() => setActiveTab('progress')}
+          >
+            Progresso
+          </button>
+        </div>
 
-      {activeTab === 'config' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-          {/* NOVO TREINO */}
-          <div>
-            <h4 className="title" style={{ marginBottom: 12 }}>Novo Template de Treino</h4>
-            <label>Nome do treino</label>
-            <input
-              value={workoutForm.name}
-              onChange={(e) => setWorkoutForm({ ...workoutForm, name: e.target.value })}
-              placeholder="Ex.: Treino A – Peito e Tríceps"
-            />
+        {/* Aba CONFIG – manter apenas "Novo Template de Treino" + "Treinos cadastrados" aqui */}
+        {activeTab === 'config' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+            {/* NOVO TREINO */}
+            <div>
+              <h4 className="title" style={{ marginBottom: 12 }}>Novo Template de Treino</h4>
+              <label>Nome do treino</label>
+              <input
+                value={workoutForm.name}
+                onChange={(e) => setWorkoutForm({ ...workoutForm, name: e.target.value })}
+                placeholder="Ex.: Treino A – Peito e Tríceps"
+              />
 
-            <div className="sep" style={{ margin: '12px 0 6px' }}></div>
-            <div className="muted" style={{ marginBottom: 6, fontSize: 13 }}>Grupos musculares</div>
-            <div className="muscle-grid">
-              {MUSCLE_GROUPS.map((group) => {
-                const active = workoutForm.muscleGroups.includes(group.value);
-                return (
-                  <button
-                    key={group.value}
-                    type="button"
-                    className={active ? 'muscle-card active' : 'muscle-card'}
-                    onClick={() => toggleMuscleGroup(group.value)}
-                  >
-                    <div className="muscle-image-wrapper">
-                      <img src={group.image} alt={group.label} className="muscle-image" />
-                    </div>
-                    <span className="muscle-label">{group.label}</span>
-                  </button>
-                );
-              })}
-            </div>
+              <div className="sep" style={{ margin: '12px 0 6px' }}></div>
+              <div className="muted" style={{ marginBottom: 6, fontSize: 13 }}>Grupos musculares</div>
+              <div className="muscle-grid">
+                {MUSCLE_GROUPS.map((group) => {
+                  const active = workoutForm.muscleGroups.includes(group.value);
+                  return (
+                    <button
+                      key={group.value}
+                      type="button"
+                      className={active ? 'muscle-card active' : 'muscle-card'}
+                      onClick={() => toggleMuscleGroup(group.value)}
+                    >
+                      <div className="muscle-image-wrapper">
+                        <img src={group.image} alt={group.label} className="muscle-image" />
+                      </div>
+                      <span className="muscle-label">{group.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
 
-            <div className="muted" style={{ margin: '14px 0 6px', fontSize: 13 }}>
-              Esportes / atividades
-            </div>
-            <div className="muscle-grid">
-              {SPORTS.map((sport) => {
-                const active = workoutForm.sportsActivities.includes(sport.value);
-                return (
-                  <button
-                    key={sport.value}
-                    type="button"
-                    className={active ? 'muscle-card active' : 'muscle-card'}
-                    onClick={() => toggleSport(sport.value)}
-                  >
-                    <div className="muscle-image-wrapper">
-                      <img src={sport.image} alt={sport.label} className="muscle-image" />
-                    </div>
-                    <span className="muscle-label">{sport.label}</span>
-                  </button>
-                );
-              })}
-            </div>
+              <div className="muted" style={{ margin: '14px 0 6px', fontSize: 13 }}>
+                Esportes / atividades
+              </div>
+              <div className="muscle-grid">
+                {SPORTS.map((sport) => {
+                  const active = workoutForm.sportsActivities.includes(sport.value);
+                  return (
+                    <button
+                      key={sport.value}
+                      type="button"
+                      className={active ? 'muscle-card active' : 'muscle-card'}
+                      onClick={() => toggleSport(sport.value)}
+                    >
+                      <div className="muscle-image-wrapper">
+                        <img src={sport.image} alt={sport.label} className="muscle-image" />
+                      </div>
+                      <span className="muscle-label">{sport.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
 
-            <div className="row" style={{ gap: 12, alignItems: 'center', marginTop: 10 }}>
-              <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                <input
-                  type="checkbox"
-                  checked={createReminder}
-                  onChange={(e) => setCreateReminder(e.target.checked)}
-                />
-                Criar lembrete para este treino
-              </label>
-              <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                <input
-                  type="checkbox"
-                  checked={sessionReminder}
-                  onChange={(e) => setSessionReminder(e.target.checked)}
-                />
-                Criar lembrete ao concluir
-              </label>
-            </div>
+              <div className="row" style={{ gap: 12, alignItems: 'center', marginTop: 10 }}>
+                <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <input
+                    type="checkbox"
+                    checked={createReminder}
+                    onChange={(e) => setCreateReminder(e.target.checked)}
+                  />
+                  Criar lembrete para este treino
+                </label>
+                <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <input
+                    type="checkbox"
+                    checked={sessionReminder}
+                    onChange={(e) => setSessionReminder(e.target.checked)}
+                  />
+                  Criar lembrete ao concluir
+                </label>
+              </div>
 
-            <div className="row" style={{ justifyContent: 'space-between', marginTop: 12 }}>
-              <button
-                className="ghost"
-                disabled={!workoutForm.id}
-                onClick={() => setWorkoutForm({ id: null, name: '', muscleGroups: [], sportsActivities: [], exercises: [] })}
-              >
-                Limpar edição
-              </button>
-              <div className="row" style={{ gap: 8 }}>
-                <button className="primary" onClick={handleSaveRoutine} disabled={loading}>
-                  {loading ? 'Salvando...' : workoutForm.id ? 'Atualizar template' : 'Salvar template'}
+              <div className="row" style={{ justifyContent: 'space-between', marginTop: 12 }}>
+                <button
+                  className="ghost"
+                  disabled={!workoutForm.id}
+                  onClick={() => setWorkoutForm({ id: null, name: '', muscleGroups: [], sportsActivities: [], exercises: [] })}
+                >
+                  Limpar edição
                 </button>
+                <div className="row" style={{ gap: 8 }}>
+                  <button className="primary" onClick={handleSaveRoutine} disabled={loading}>
+                    {loading ? 'Salvando...' : workoutForm.id ? 'Atualizar template' : 'Salvar template'}
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
 
-          {/* TREINOS CADASTRADOS */}
-          <div>
-            <h4 className="title" style={{ marginBottom: 12 }}>Treinos cadastrados</h4>
-            {!routines.length && <div className="muted">Nenhum treino cadastrado.</div>}
-            {routines.length > 0 && (
-              <div className="table">
-                {routines.map((template) => (
-                  <div
-                    key={template.id || template.name}
-                    className="workout-template-item table-row"
-                  >
-                    <div className="workout-template-header">
-                      <strong>{template.name}</strong>
-                      <div className="workout-template-subtitle">
-                        {Array.isArray(template.muscleGroups) && template.muscleGroups.length > 0 && (
-                          <span>
-                            {(template.muscleGroups || [])
-                              .map((group) => muscleMap[group]?.label || group)
-                              .join(', ')}
-                          </span>
-                        )}
-                      </div>
-                      {Array.isArray(template.sportsActivities) && template.sportsActivities.length > 0 && (
+            {/* TREINOS CADASTRADOS */}
+            <div>
+              <h4 className="title" style={{ marginBottom: 12 }}>Treinos cadastrados</h4>
+              {!routines.length && <div className="muted">Nenhum treino cadastrado.</div>}
+              {routines.length > 0 && (
+                <div className="table">
+                  {routines.map((template) => (
+                    <div
+                      key={template.id || template.name}
+                      className="workout-template-item table-row"
+                    >
+                      <div className="workout-template-header">
+                        <strong>{template.name}</strong>
                         <div className="workout-template-subtitle">
+                          {Array.isArray(template.muscleGroups) && template.muscleGroups.length > 0 && (
+                            <span>
+                              {(template.muscleGroups || [])
+                                .map((group) => muscleMap[group]?.label || group)
+                                .join(', ')}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="workout-template-actions">
+                        <button
+                          type="button"
+                          className="ghost"
+                          onClick={() => {
+                            const sportsActivities = syncSportsFromTemplate(
+                              template.sportsActivities,
+                              template.sports
+                            );
+
+                            setWorkoutForm({
+                              ...template,
+                              muscleGroups: Array.isArray(template.muscleGroups)
+                                ? template.muscleGroups
+                                : template.muscle_groups || [],
+                              sportsActivities,
+                              sports: sportsActivities,
+                            });
+                          }}
+                        >
+                          Editar
+                        </button>
+                        <button
+                          type="button"
+                          className="ghost"
+                          onClick={() => handleOpenViewWorkout({
+                            ...template,
+                            sportsActivities: syncSportsFromTemplate(
+                              template.sportsActivities,
+                              template.sports
+                            )
+                          })}
+                        >
+                          Ver treino
+                        </button>
+                        <button
+                          type="button"
+                          className="ghost small btn-danger-outline"
+                          onClick={() => handleDeleteRoutine(template.id)}
+                        >
+                          Excluir
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Aba HISTÓRICO – copiar exatamente o conteúdo atual do bloco activeTab === 'history' */}
+        {activeTab === 'history' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div className="row" style={{ gap: 8 }}>
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                <label>De</label>
+                <input
+                  type="date"
+                  value={historyRange.from}
+                  onChange={(e) => setHistoryRange((prev) => ({ ...prev, from: e.target.value }))}
+                />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                <label>Até</label>
+                <input
+                  type="date"
+                  value={historyRange.to}
+                  onChange={(e) => setHistoryRange((prev) => ({ ...prev, to: e.target.value }))}
+                />
+              </div>
+            </div>
+
+            {!sessions.length && <div className="muted">Nenhum treino registrado no período.</div>}
+            {sessions.length > 0 && (
+              <div className="table">
+                {sessions.map((session) => (
+                  <details key={session.id} className="table-row" open>
+                    <summary style={{ cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      <div className="row" style={{ justifyContent: 'space-between' }}>
+                        <div style={{ fontWeight: 600 }}>{session.name}</div>
+                        <span className="muted" style={{ fontSize: 13 }}>{session.date}</span>
+                      </div>
+                      <div className="muted" style={{ fontSize: 13 }}>
+                        {(session.muscleGroups || []).map((g) => muscleMap[g]?.label || g).join(', ')}
+                      </div>
+                      {Array.isArray(session.sportsActivities) && session.sportsActivities.length > 0 && (
+                        <div className="muted" style={{ fontSize: 13 }}>
                           Esportes/atividades:{' '}
-                          {(template.sportsActivities || [])
+                          {session.sportsActivities
                             .map((sport) => sportsMap[sport]?.label || sport)
                             .join(', ')}
                         </div>
                       )}
+                      <div className="muted" style={{ fontSize: 12 }}>
+                        {(session.exercises || []).map(formatExerciseResume).join('; ')}
+                      </div>
+                    </summary>
+                    <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 12 }}>
+                      {(session.exercises || []).map((ex) => (
+                        <div
+                          key={ex.id}
+                          style={{
+                            border: '1px solid rgba(255,255,255,0.08)',
+                            padding: 12,
+                            borderRadius: 10,
+                            background: '#0f131c',
+                          }}
+                        >
+                          <div className="row" style={{ justifyContent: 'space-between' }}>
+                            <strong>{ex.name}</strong>
+                            <span className="muted" style={{ fontSize: 12 }}>
+                              {muscleMap[ex.muscleGroupId]?.label || ex.muscleGroupId}
+                            </span>
+                          </div>
+                          <div className="muted" style={{ fontSize: 13 }}>
+                            Séries: {ex.sets} · Repetições: {ex.reps} · Peso: {ex.weight || '--'}kg · Descanso: {ex.restSeconds}s
+                          </div>
+                          {ex.notes && (
+                            <div style={{ marginTop: 6, fontSize: 13 }}>
+                              <strong>Anotações:</strong> {ex.notes}
+                            </div>
+                          )}
+                        </div>
+                      ))}
                     </div>
-
-                    <div className="workout-template-actions">
-                      <button
-                        type="button"
-                        className="ghost small btn-outline"
-                        onClick={() => handleOpenViewWorkout({
-                          ...template,
-                          sportsActivities: syncSportsFromTemplate(
-                            template.sportsActivities,
-                            template.sports
-                          )
-                        })}
-                      >
-                        Ver treino
-                      </button>
-                      <button
-                        type="button"
-                        className="ghost small btn-danger-outline"
-                        onClick={() => handleDeleteRoutine(template.id)}
-                      >
-                        Excluir
-                      </button>
-                    </div>
-                  </div>
+                  </details>
                 ))}
               </div>
             )}
           </div>
+        )}
 
-          <div className="sep" style={{ margin: '18px 0' }}></div>
-
-          {/* SEMANA DE TREINO */}
-          <div>
-            <h4 className="title" style={{ marginBottom: 12 }}>Semana de Treino</h4>
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-                gap: 16,
-              }}
-            >
-              {schedule.map((slot) => (
-                <div
-                  key={slot.day}
-                  style={{
-                    borderRadius: 12,
-                    background: '#131722',
-                    padding: 16,
-                    boxShadow: '0 12px 30px rgba(0, 0, 0, 0.15)',
-                    border: '1px solid rgba(255,255,255,0.08)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: 12,
-                  }}
-                >
-                  <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600 }}>
-                      <span
-                        style={{
-                          display: 'inline-flex',
-                          width: 32,
-                          height: 32,
-                          borderRadius: 8,
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          background: 'rgba(255, 255, 255, 0.06)',
-                        }}
-                      >
-                        📅
-                      </span>
-                      {slot.day.toUpperCase()}
-                    </div>
-                    {slot.workout_id && (
-                      <span
-                        style={{
-                          padding: '4px 10px',
-                          borderRadius: 12,
-                          background: 'rgba(80, 190, 120, 0.15)',
-                          color: '#50be78',
-                          fontSize: 12,
-                          fontWeight: 600,
-                        }}
-                      >
-                        Treino ativo
-                      </span>
-                    )}
-                  </div>
-
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    <label style={{ fontSize: 13, color: '#9ba4b5' }}>Treino</label>
-                    <select
-                      value={slot.workout_id}
-                      onChange={(e) => handleScheduleChange(slot.day, 'workout_id', e.target.value)}
-                      style={{
-                        background: '#0f131c',
-                        border: '1px solid rgba(255,255,255,0.08)',
-                        color: '#fff',
-                        borderRadius: 10,
-                        padding: '10px 12px',
-                      }}
-                    >
-                      <option value="">Selecione um treino</option>
-                      {routines.map((item) => (
-                        <option key={item.id || item.name} value={item.id}>
-                          {item.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    <label style={{ fontSize: 13, color: '#9ba4b5' }}>Horário</label>
-                    <div
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 8,
-                        background: '#0f131c',
-                        border: '1px solid rgba(255,255,255,0.08)',
-                        borderRadius: 10,
-                        padding: '8px 12px',
-                      }}
-                    >
-                      <span role="img" aria-label="Relógio">
-                        🕒
-                      </span>
-                      <input
-                        type="time"
-                        value={slot.time}
-                        onChange={(e) => handleScheduleChange(slot.day, 'time', e.target.value)}
-                        style={{
-                          flex: 1,
-                          border: 'none',
-                          background: 'transparent',
-                          color: '#fff',
-                          outline: 'none',
-                        }}
-                      />
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    <label style={{ fontSize: 13, color: '#9ba4b5' }}>Lembrete</label>
-                    <label
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        background: '#0f131c',
-                        borderRadius: 12,
-                        padding: '10px 12px',
-                        border: '1px solid rgba(255,255,255,0.08)',
-                      }}
-                    >
-                      <span style={{ color: '#d3d8e6' }}>Ativar lembrete</span>
-                      <div
-                        style={{
-                          position: 'relative',
-                          width: 56,
-                          height: 28,
-                          borderRadius: 20,
-                          background: slot.reminder ? '#4ade80' : 'rgba(255,255,255,0.12)',
-                          transition: 'all 0.2s ease',
-                          boxShadow: slot.reminder
-                            ? '0 10px 20px rgba(74, 222, 128, 0.35)'
-                            : 'inset 0 1px 4px rgba(0,0,0,0.2)',
-                        }}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={!!slot.reminder}
-                          onChange={(e) => handleScheduleChange(slot.day, 'reminder', e.target.checked)}
-                          style={{
-                            position: 'absolute',
-                            inset: 0,
-                            opacity: 0,
-                            cursor: 'pointer',
-                          }}
-                        />
-                        <span
-                          style={{
-                            position: 'absolute',
-                            top: 3,
-                            left: slot.reminder ? 30 : 4,
-                            width: 22,
-                            height: 22,
-                            borderRadius: '50%',
-                            background: '#fff',
-                            boxShadow: '0 6px 12px rgba(0,0,0,0.25)',
-                            transition: 'all 0.2s ease',
-                          }}
-                        ></span>
-                      </div>
-                    </label>
-                  </div>
-                </div>
-              ))}
+        {/* Aba PROGRESSO – copiar exatamente o conteúdo atual do bloco activeTab === 'progress' */}
+        {activeTab === 'progress' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div className="muted" style={{ fontSize: 14 }}>
+              Total de treinos no mês: <strong>{progress.totalSessions || 0}</strong>
             </div>
-            <div className="row" style={{ justifyContent: 'flex-end', marginTop: 12 }}>
-              <button
-                className="primary"
-                onClick={handleSaveSchedule}
-                disabled={savingSchedule || !hasRoutines}
-              >
-                {savingSchedule ? 'Salvando...' : 'Salvar semana de treino'}
-              </button>
-            </div>
-            {!hasRoutines && (
-              <div className="muted" style={{ marginTop: 8, fontSize: 13 }}>
-                Cadastre ao menos um treino para montar a semana.
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {activeTab === 'history' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <div className="row" style={{ gap: 8 }}>
-            <div style={{ display: 'flex', flexDirection: 'column' }}>
-              <label>De</label>
-              <input
-                type="date"
-                value={historyRange.from}
-                onChange={(e) => setHistoryRange((prev) => ({ ...prev, from: e.target.value }))}
-              />
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column' }}>
-              <label>Até</label>
-              <input
-                type="date"
-                value={historyRange.to}
-                onChange={(e) => setHistoryRange((prev) => ({ ...prev, to: e.target.value }))}
-              />
-            </div>
-          </div>
-
-          {!sessions.length && <div className="muted">Nenhum treino registrado no período.</div>}
-          {sessions.length > 0 && (
-            <div className="table">
-              {sessions.map((session) => (
-                <details key={session.id} className="table-row" open>
-                  <summary style={{ cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 4 }}>
-                    <div className="row" style={{ justifyContent: 'space-between' }}>
-                      <div style={{ fontWeight: 600 }}>{session.name}</div>
-                      <span className="muted" style={{ fontSize: 13 }}>{session.date}</span>
-                    </div>
-                    <div className="muted" style={{ fontSize: 13 }}>
-                      {(session.muscleGroups || []).map((g) => muscleMap[g]?.label || g).join(', ')}
-                    </div>
-                    {Array.isArray(session.sportsActivities) && session.sportsActivities.length > 0 && (
-                      <div className="muted" style={{ fontSize: 13 }}>
-                        Esportes/atividades:{' '}
-                        {session.sportsActivities
-                          .map((sport) => sportsMap[sport]?.label || sport)
-                          .join(', ')}
-                      </div>
-                    )}
-                    <div className="muted" style={{ fontSize: 12 }}>
-                      {(session.exercises || []).map(formatExerciseResume).join('; ')}
-                    </div>
-                  </summary>
-                  <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 12 }}>
-                    {(session.exercises || []).map((ex) => (
-                      <div
-                        key={ex.id}
-                        style={{
-                          border: '1px solid rgba(255,255,255,0.08)',
-                          padding: 12,
-                          borderRadius: 10,
-                          background: '#0f131c',
-                        }}
-                      >
-                        <div className="row" style={{ justifyContent: 'space-between' }}>
-                          <strong>{ex.name}</strong>
-                          <span className="muted" style={{ fontSize: 12 }}>
-                            {muscleMap[ex.muscleGroupId]?.label || ex.muscleGroupId}
-                          </span>
-                        </div>
-                        <div className="muted" style={{ fontSize: 13 }}>
-                          Séries: {ex.sets} · Repetições: {ex.reps} · Peso: {ex.weight || '--'}kg · Descanso: {ex.restSeconds}s
-                        </div>
-                        {ex.notes && (
-                          <div style={{ marginTop: 6, fontSize: 13 }}>
-                            <strong>Anotações:</strong> {ex.notes}
-                          </div>
-                        )}
-                      </div>
-                    ))}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {Object.entries(progress.byMuscleGroup || {}).map(([muscle, count]) => (
+                <div key={muscle}>
+                  <div className="row" style={{ justifyContent: 'space-between', fontSize: 13 }}>
+                    <span>{muscleMap[muscle]?.label || muscle}</span>
+                    <span className="muted">{count} treino(s)</span>
                   </div>
-                </details>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {activeTab === 'progress' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <div className="muted" style={{ fontSize: 14 }}>
-            Total de treinos no mês: <strong>{progress.totalSessions || 0}</strong>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {Object.entries(progress.byMuscleGroup || {}).map(([muscle, count]) => (
-              <div key={muscle}>
-                <div className="row" style={{ justifyContent: 'space-between', fontSize: 13 }}>
-                  <span>{muscleMap[muscle]?.label || muscle}</span>
-                  <span className="muted">{count} treino(s)</span>
-                </div>
-                <div
-                  style={{
-                    height: 10,
-                    background: 'rgba(255,255,255,0.08)',
-                    borderRadius: 10,
-                    overflow: 'hidden',
-                  }}
-                >
                   <div
                     style={{
-                      width: `${Math.min((count / Math.max(progress.totalSessions, 1)) * 100, 100)}%`,
-                      height: '100%',
-                      background: '#50be78',
+                      height: 10,
+                      background: 'rgba(255,255,255,0.08)',
+                      borderRadius: 10,
+                      overflow: 'hidden',
                     }}
-                  ></div>
+                  >
+                    <div
+                      style={{
+                        width: `${Math.min((count / Math.max(progress.totalSessions, 1)) * 100, 100)}%`,
+                        height: '100%',
+                        background: '#50be78',
+                      }}
+                    ></div>
+                  </div>
+                </div>
+              ))}
+              {Object.keys(progress.byMuscleGroup || {}).length === 0 && (
+                <div className="muted">Nenhum progresso registrado ainda.</div>
+              )}
+            </div>
+          </div>
+        )}
+      </section>
+
+      {/* COLUNA DIREITA – Semana de Treino (só aparece na aba de configuração) */}
+      {activeTab === 'config' && (
+        <section className="card" style={{ marginTop: 16 }}>
+          <h4 className="title" style={{ marginBottom: 12 }}>Semana de Treino</h4>
+
+          {/* usar exatamente o mesmo conteúdo que hoje está dentro do comentário "SEMANA DE TREINO" */}
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+              gap: 16,
+            }}
+          >
+            {schedule.map((slot) => (
+              <div
+                key={slot.day}
+                style={{
+                  borderRadius: 12,
+                  background: '#131722',
+                  padding: 16,
+                  boxShadow: '0 12px 30px rgba(0, 0, 0, 0.15)',
+                  border: '1px solid rgba(255,255,255,0.08)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 12,
+                }}
+              >
+                <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600 }}>
+                    <span
+                      style={{
+                        display: 'inline-flex',
+                        width: 32,
+                        height: 32,
+                        borderRadius: 8,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        background: 'rgba(255, 255, 255, 0.06)',
+                      }}
+                    >
+                      📅
+                    </span>
+                    {slot.day.toUpperCase()}
+                  </div>
+                  {slot.workout_id && (
+                    <span
+                      style={{
+                        padding: '4px 10px',
+                        borderRadius: 12,
+                        background: 'rgba(80, 190, 120, 0.15)',
+                        color: '#50be78',
+                        fontSize: 12,
+                        fontWeight: 600,
+                      }}
+                    >
+                      Treino ativo
+                    </span>
+                  )}
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <label style={{ fontSize: 13, color: '#9ba4b5' }}>Treino</label>
+                  <select
+                    value={slot.workout_id}
+                    onChange={(e) => handleScheduleChange(slot.day, 'workout_id', e.target.value)}
+                    style={{
+                      background: '#0f131c',
+                      border: '1px solid rgba(255,255,255,0.08)',
+                      color: '#fff',
+                      borderRadius: 10,
+                      padding: '10px 12px',
+                    }}
+                  >
+                    <option value="">Selecione um treino</option>
+                    {routines.map((item) => (
+                      <option key={item.id || item.name} value={item.id}>
+                        {item.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <label style={{ fontSize: 13, color: '#9ba4b5' }}>Horário</label>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      background: '#0f131c',
+                      border: '1px solid rgba(255,255,255,0.08)',
+                      borderRadius: 10,
+                      padding: '8px 12px',
+                    }}
+                  >
+                    <span role="img" aria-label="Relógio">
+                      🕒
+                    </span>
+                    <input
+                      type="time"
+                      value={slot.time}
+                      onChange={(e) => handleScheduleChange(slot.day, 'time', e.target.value)}
+                      style={{
+                        flex: 1,
+                        border: 'none',
+                        background: 'transparent',
+                        color: '#fff',
+                        outline: 'none',
+                      }}
+                    />
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <label style={{ fontSize: 13, color: '#9ba4b5' }}>Lembrete</label>
+                  <label
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      background: '#0f131c',
+                      borderRadius: 12,
+                      padding: '10px 12px',
+                      border: '1px solid rgba(255,255,255,0.08)',
+                    }}
+                  >
+                    <span style={{ color: '#d3d8e6' }}>Ativar lembrete</span>
+                    <div
+                      style={{
+                        position: 'relative',
+                        width: 56,
+                        height: 28,
+                        borderRadius: 20,
+                        background: slot.reminder ? '#4ade80' : 'rgba(255,255,255,0.12)',
+                        transition: 'all 0.2s ease',
+                        boxShadow: slot.reminder
+                          ? '0 10px 20px rgba(74, 222, 128, 0.35)'
+                          : 'inset 0 1px 4px rgba(0,0,0,0.2)',
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={!!slot.reminder}
+                        onChange={(e) => handleScheduleChange(slot.day, 'reminder', e.target.checked)}
+                        style={{
+                          position: 'absolute',
+                          inset: 0,
+                          opacity: 0,
+                          cursor: 'pointer',
+                        }}
+                      />
+                      <span
+                        style={{
+                          position: 'absolute',
+                          top: 3,
+                          left: slot.reminder ? 30 : 4,
+                          width: 22,
+                          height: 22,
+                          borderRadius: '50%',
+                          background: '#fff',
+                          boxShadow: '0 6px 12px rgba(0,0,0,0.25)',
+                          transition: 'all 0.2s ease',
+                        }}
+                      ></span>
+                    </div>
+                  </label>
                 </div>
               </div>
             ))}
-            {Object.keys(progress.byMuscleGroup || {}).length === 0 && (
-              <div className="muted">Nenhum progresso registrado ainda.</div>
-            )}
           </div>
-        </div>
+
+          <div className="row" style={{ justifyContent: 'flex-end', marginTop: 12 }}>
+            <button
+              className="primary"
+              onClick={handleSaveSchedule}
+              disabled={savingSchedule || !hasRoutines}
+            >
+              {savingSchedule ? 'Salvando...' : 'Salvar semana de treino'}
+            </button>
+          </div>
+
+          {!hasRoutines && (
+            <div className="muted" style={{ marginTop: 8, fontSize: 13 }}>
+              Cadastre ao menos um treino para montar a semana.
+            </div>
+          )}
+        </section>
       )}
 
+      {/* Modal continua funcionando normalmente, fora dos cards */}
       <ViewWorkoutModal
         open={isViewModalOpen}
         workout={viewWorkout}
@@ -1296,7 +1320,7 @@ const WorkoutRoutine = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL, pushTo
         onChangeDuration={setRestDuration}
         onStart={startRestTimer}
       />
-    </section>
+    </div>
   );
 };
 
