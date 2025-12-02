@@ -84,6 +84,27 @@ const formatExerciseResume = (exercise) => {
   return `${base}${weightPart}`;
 };
 
+const formatSessionDate = (rawDate) => {
+  if (!rawDate) return '';
+
+  const value = String(rawDate);
+
+  // Pega só YYYY-MM-DD (formato do Supabase)
+  const isoDate = value.slice(0, 10);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(isoDate)) {
+    const [year, month, day] = isoDate.split('-');
+    return `${day}/${month}/${year}`;
+  }
+
+  // Fallback para Date normal
+  const d = new Date(value);
+  if (!Number.isNaN(d.getTime())) {
+    return d.toLocaleDateString('pt-BR');
+  }
+
+  return value;
+};
+
 const WorkoutRestTimer = ({
   restDuration,
   restCountdown,
@@ -1015,7 +1036,9 @@ const WorkoutRoutine = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL, pushTo
                     <summary style={{ cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 4 }}>
                       <div className="row" style={{ justifyContent: 'space-between' }}>
                         <div style={{ fontWeight: 600 }}>{session.name}</div>
-                        <span className="muted" style={{ fontSize: 13 }}>{session.date}</span>
+                        <span className="muted" style={{ fontSize: 13 }}>
+                          {formatSessionDate(session.date || session.performed_at)}
+                        </span>
                       </div>
                       <div className="muted" style={{ fontSize: 13 }}>
                         {(session.muscleGroups || []).map((g) => muscleMap[g]?.label || g).join(', ')}
