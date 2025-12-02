@@ -342,6 +342,134 @@ const WorkoutRoutine = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL, pushTo
   const [createReminder, setCreateReminder] = useState(false);
   const [sessionReminder, setSessionReminder] = useState(false);
 
+  const progressStats = useMemo(() => {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = today.getMonth(); // 0-11
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+    if (!Array.isArray(sessions) || sessions.length === 0) {
+      return {
+        daysTrained: 0,
+        daysInMonth,
+        mostPerformedWorkoutName: null,
+        mostPerformedWorkoutCount: 0,
+        mostWorkedMuscleKey: null,
+        mostWorkedMuscleLabel: null,
+        mostWorkedMuscleCount: 0,
+        weeklySummary: [],
+        bestWeekdayKey: null,
+        bestWeekdayLabel: null,
+        bestWeekdayCount: 0,
+      };
+    }
+
+    // Filtrar sessões do mês atual
+    const sessionsThisMonth = sessions.filter((session) => {
+      if (!session.date) return false;
+      const d = new Date(session.date);
+      if (Number.isNaN(d.getTime())) return false;
+      return d.getFullYear() === year && d.getMonth() === month;
+    });
+
+    // Dias treinados (dias únicos no mês)
+    const uniqueDays = new Set(
+      sessionsThisMonth
+        .map((s) => s.date)
+        .filter(Boolean)
+    );
+    const daysTrained = uniqueDays.size;
+
+    // Treino mais realizado (por nome)
+    const workoutCount = {};
+    sessionsThisMonth.forEach((s) => {
+      if (!s.name) return;
+      workoutCount[s.name] = (workoutCount[s.name] || 0) + 1;
+    });
+
+    let mostPerformedWorkoutName = null;
+    let mostPerformedWorkoutCount = 0;
+    Object.entries(workoutCount).forEach(([name, count]) => {
+      if (count > mostPerformedWorkoutCount) {
+        mostPerformedWorkoutCount = count;
+        mostPerformedWorkoutName = name;
+      }
+    });
+
+    // Músculo mais trabalhado (usa progress.byMuscleGroup)
+    let mostWorkedMuscleKey = null;
+    let mostWorkedMuscleLabel = null;
+    let mostWorkedMuscleCount = 0;
+    Object.entries(progress.byMuscleGroup || {}).forEach(([muscleKey, count]) => {
+      if (count > mostWorkedMuscleCount) {
+        mostWorkedMuscleCount = count;
+        mostWorkedMuscleKey = muscleKey;
+        mostWorkedMuscleLabel = muscleMap[muscleKey]?.label || muscleKey;
+      }
+    });
+
+    // Evolução semanal (4 semanas no mês)
+    const weeklyBuckets = [0, 0, 0, 0];
+    sessionsThisMonth.forEach((s) => {
+      if (!s.date) return;
+      const d = new Date(s.date);
+      if (Number.isNaN(d.getTime())) return;
+      const dayOfMonth = d.getDate(); // 1..31
+      const weekIndex = Math.min(Math.floor((dayOfMonth - 1) / 7), weeklyBuckets.length - 1);
+      weeklyBuckets[weekIndex] += 1;
+    });
+
+    const weeklySummary = weeklyBuckets.map((count, index) => ({
+      label: `Semana ${index + 1}`,
+      count,
+    }));
+
+    // Melhor dia da semana
+    const weekdayMap = {
+      0: 'Domingo',
+      1: 'Segunda-feira',
+      2: 'Terça-feira',
+      3: 'Quarta-feira',
+      4: 'Quinta-feira',
+      5: 'Sexta-feira',
+      6: 'Sábado',
+    };
+    const weekdayCount = {};
+    sessionsThisMonth.forEach((s) => {
+      if (!s.date) return;
+      const d = new Date(s.date);
+      if (Number.isNaN(d.getTime())) return;
+      const wd = d.getDay();
+      weekdayCount[wd] = (weekdayCount[wd] || 0) + 1;
+    });
+
+    let bestWeekdayKey = null;
+    let bestWeekdayLabel = null;
+    let bestWeekdayCount = 0;
+    Object.entries(weekdayCount).forEach(([wdKey, count]) => {
+      const wdNum = Number(wdKey);
+      if (count > bestWeekdayCount) {
+        bestWeekdayCount = count;
+        bestWeekdayKey = wdNum;
+        bestWeekdayLabel = weekdayMap[wdNum] || '';
+      }
+    });
+
+    return {
+      daysTrained,
+      daysInMonth,
+      mostPerformedWorkoutName,
+      mostPerformedWorkoutCount,
+      mostWorkedMuscleKey,
+      mostWorkedMuscleLabel,
+      mostWorkedMuscleCount,
+      weeklySummary,
+      bestWeekdayKey,
+      bestWeekdayLabel,
+      bestWeekdayCount,
+    };
+  }, [sessions, progress, muscleMap]);
+
   const muscleMap = useMemo(
     () =>
       MUSCLE_GROUPS.reduce(
@@ -811,6 +939,7 @@ const WorkoutRoutine = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL, pushTo
       loadSessions();
     } else if (activeTab === 'progress') {
       loadProgress();
+      loadSessions();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, historyRange]);
@@ -831,6 +960,18 @@ const WorkoutRoutine = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL, pushTo
     setRestCountdown(restDuration);
     setRestRunning(true);
   };
+
+  const {
+    daysTrained,
+    daysInMonth,
+    mostPerformedWorkoutName,
+    mostPerformedWorkoutCount,
+    mostWorkedMuscleLabel,
+    mostWorkedMuscleCount,
+    weeklySummary,
+    bestWeekdayLabel,
+    bestWeekdayCount,
+  } = progressStats;
 
   return (
     <div className="workout-card">
@@ -1096,6 +1237,209 @@ const WorkoutRoutine = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL, pushTo
             <div className="muted" style={{ fontSize: 14 }}>
               Total de treinos no mês: <strong>{progress.totalSessions || 0}</strong>
             </div>
+
+            {/* Resumo do mês: dias treinados + mini progress bar */}
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+                gap: 16,
+              }}
+            >
+              {/* Card – Dias treinados vs dias do mês */}
+              <div
+                style={{
+                  borderRadius: 12,
+                  background: '#131722',
+                  padding: 16,
+                  border: '1px solid rgba(255,255,255,0.08)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 8,
+                }}
+              >
+                <div style={{ fontWeight: 600 }}>Frequência no mês</div>
+                <div className="muted" style={{ fontSize: 13 }}>
+                  Você treinou <strong>{daysTrained}</strong> dia(s) de{' '}
+                  <strong>{daysInMonth}</strong>.
+                </div>
+                <div
+                  style={{
+                    marginTop: 8,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                  }}
+                >
+                  <div
+                    style={{
+                      display: 'flex',
+                      gap: 2,
+                      fontSize: 12,
+                    }}
+                  >
+                    {Array.from({ length: 10 }).map((_, index) => {
+                      const filledSegments = daysInMonth
+                        ? Math.round((daysTrained / Math.max(daysInMonth, 1)) * 10)
+                        : 0;
+                      const active = index < filledSegments;
+                      return (
+                        <span
+                          key={index}
+                          style={{
+                            width: 10,
+                            height: 10,
+                            borderRadius: 2,
+                            background: active
+                              ? '#50be78'
+                              : 'rgba(255,255,255,0.12)',
+                          }}
+                        ></span>
+                      );
+                    })}
+                  </div>
+                  <span className="muted" style={{ fontSize: 12 }}>
+                    {daysTrained}/{daysInMonth}
+                  </span>
+                </div>
+              </div>
+
+              {/* Card – Treino mais realizado + músculo mais trabalhado */}
+              <div
+                style={{
+                  borderRadius: 12,
+                  background: '#131722',
+                  padding: 16,
+                  border: '1px solid rgba(255,255,255,0.08)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 6,
+                }}
+              >
+                <div style={{ fontWeight: 600 }}>Highlights do mês</div>
+                <div style={{ fontSize: 13 }}>
+                  <span style={{ marginRight: 6 }}>🏆</span>
+                  Treino mais realizado:{' '}
+                  <strong>{mostPerformedWorkoutName || '—'}</strong>
+                  {mostPerformedWorkoutCount > 0 && (
+                    <span className="muted" style={{ fontSize: 12 }}>
+                      {' '}
+                      ({mostPerformedWorkoutCount}x)
+                    </span>
+                  )}
+                </div>
+                <div style={{ fontSize: 13 }}>
+                  <span style={{ marginRight: 6 }}>🔥</span>
+                  Músculo mais trabalhado:{' '}
+                  <strong>{mostWorkedMuscleLabel || '—'}</strong>
+                  {mostWorkedMuscleCount > 0 && (
+                    <span className="muted" style={{ fontSize: 12 }}>
+                      {' '}
+                      ({mostWorkedMuscleCount} treino(s))
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Evolução semanal + melhor dia da semana */}
+            <div
+              style={{
+                borderRadius: 12,
+                background: '#131722',
+                padding: 16,
+                border: '1px solid rgba(255,255,255,0.08)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 10,
+              }}
+            >
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                }}
+              >
+                <div style={{ fontWeight: 600 }}>Evolução semanal</div>
+                {bestWeekdayLabel && (
+                  <div
+                    style={{
+                      fontSize: 12,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'flex-end',
+                    }}
+                  >
+                    <span>📅 Dia que você mais treina:</span>
+                    <span>
+                      <strong>{bestWeekdayLabel}</strong>{' '}
+                      {bestWeekdayCount > 0 && (
+                        <span className="muted" style={{ fontSize: 11 }}>
+                          ({bestWeekdayCount} treino(s))
+                        </span>
+                      )}
+                    </span>
+                    <span className="muted" style={{ fontSize: 11 }}>
+                      A {bestWeekdayLabel.split('-')[0].toLowerCase()} é seu dia brabo!
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {(!weeklySummary || weeklySummary.length === 0) && (
+                <div className="muted" style={{ fontSize: 13 }}>
+                  Nenhum treino registrado neste mês ainda.
+                </div>
+              )}
+
+              {weeklySummary && weeklySummary.length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {(() => {
+                    const maxWeekCount = Math.max(
+                      ...weeklySummary.map((w) => w.count || 0),
+                      1
+                    );
+                    return weeklySummary.map((week) => (
+                      <div key={week.label}>
+                        <div
+                          className="row"
+                          style={{
+                            justifyContent: 'space-between',
+                            fontSize: 12,
+                            marginBottom: 2,
+                          }}
+                        >
+                          <span>{week.label}</span>
+                          <span className="muted">{week.count} treino(s)</span>
+                        </div>
+                        <div
+                          style={{
+                            height: 8,
+                            borderRadius: 999,
+                            background: 'rgba(255,255,255,0.06)',
+                            overflow: 'hidden',
+                          }}
+                        >
+                          <div
+                            style={{
+                              width: `${Math.min(
+                                ((week.count || 0) / maxWeekCount) * 100,
+                                100
+                              )}%`,
+                              height: '100%',
+                              background: '#50be78',
+                            }}
+                          ></div>
+                        </div>
+                      </div>
+                    ));
+                  })()}
+                </div>
+              )}
+            </div>
+
+            {/* Progresso por grupo muscular (bloco original, mantido) */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {Object.entries(progress.byMuscleGroup || {}).map(([muscle, count]) => (
                 <div key={muscle}>
@@ -1113,7 +1457,10 @@ const WorkoutRoutine = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL, pushTo
                   >
                     <div
                       style={{
-                        width: `${Math.min((count / Math.max(progress.totalSessions, 1)) * 100, 100)}%`,
+                        width: `${Math.min(
+                          (count / Math.max(progress.totalSessions, 1)) * 100,
+                          100
+                        )}%`,
                         height: '100%',
                         background: '#50be78',
                       }}
