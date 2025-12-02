@@ -1273,7 +1273,12 @@ function App() {
       {activeView === 'foodDiary' && (
         <div className="container single-card">
           <section className="card">
-            <FoodDiary userId={session.user.id} />
+            <FoodDiary
+              apiBaseUrl={workoutApiBase}
+              supabase={client}
+              notify={pushToast}
+              userId={session?.user?.id}
+            />
           </section>
         </div>
       )}
