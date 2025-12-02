@@ -551,3 +551,102 @@ canvas{ background:transparent; }
 .workout-timer-section {
   margin-top: 8px;
 }
+
+/* ===========================
+   Diário alimentar – Rotina de Treino
+   =========================== */
+
+.food-diary {
+  margin-top: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.food-diary-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1.1fr);
+  gap: 16px;
+}
+
+.food-diary-left {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.food-diary-right {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.food-diary-form .field textarea {
+  resize: vertical;
+}
+
+.food-diary-summary-card {
+  padding: 12px;
+  border-radius: 12px;
+  background: var(--card-2);
+  border: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.food-diary-meta-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.food-diary-meta-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+}
+
+.food-diary-bar {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    'Liberation Mono', 'Courier New', monospace;
+  letter-spacing: 1px;
+}
+
+.food-diary-entries {
+  margin-top: 8px;
+  max-height: 230px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.food-diary-entry {
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  font-size: 13px;
+}
+
+.food-diary-entry:last-child {
+  border-bottom: none;
+}
+
+.food-diary-entry-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.food-diary-entry-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+@media (max-width: 900px) {
+  .food-diary-grid {
+    grid-template-columns: 1fr;
+  }
+}

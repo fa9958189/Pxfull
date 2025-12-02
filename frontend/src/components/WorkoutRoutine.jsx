@@ -13,6 +13,7 @@ import BoxeImg from '../assets/muscles/Boxe.png';
 import JiuJitsuImg from '../assets/muscles/Jiu-jitsu.png';
 import FutebolImg from '../assets/muscles/Futebol.png';
 import BeachTennisImg from '../assets/muscles/beach tennis.png';
+import FoodDiary from './FoodDiary.jsx';
 
 const muscleGroups = [
   { id: 'peito', name: 'Peito', image: PeitoImg },
@@ -1646,6 +1647,12 @@ const WorkoutRoutine = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL, pushTo
               </div>
             ))}
           </div>
+
+          {/* Divisor visual entre semana de treino e diário alimentar */}
+          <div className="sep" style={{ margin: '18px 0' }}></div>
+
+          {/* Diário alimentar + metas diárias + altura/peso */}
+          <FoodDiary key={userId || 'default'} userId={userId} />
 
           <div className="row" style={{ justifyContent: 'flex-end', marginTop: 12 }}>
             <button
