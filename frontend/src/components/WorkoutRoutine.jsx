@@ -620,18 +620,33 @@ const WorkoutRoutine = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL, pushTo
     if (!window.confirm('Tem certeza que deseja excluir este treino?')) return;
 
     try {
-      const response = await fetch(`${apiBaseUrl}/api/workout/routines/${id}`, { method: 'DELETE' });
+      if (!userId) {
+        notify('Perfil do usuário não carregado.', 'warning');
+        return;
+      }
+
+      // Agora enviando o userId na query string para o backend
+      const response = await fetch(
+        `${apiBaseUrl}/api/workout/routines/${id}?userId=${userId}`,
+        { method: 'DELETE' }
+      );
 
       if (!response.ok) {
         throw new Error('Não foi possível excluir o treino.');
       }
 
+      // Remove o treino da lista em memória
       setRoutines((prev) => prev.filter((tpl) => tpl.id !== id));
+
+      // Limpa o treino do cronograma (semana de treino)
       setSchedule((prev) =>
-        prev.map((slot) => (slot.workout_id === id ? { ...slot, workout_id: '' } : slot))
+        prev.map((slot) =>
+          slot.workout_id === id ? { ...slot, workout_id: '' } : slot
+        )
       );
     } catch (err) {
       console.error('Erro ao excluir treino', err);
+      notify(err.message || 'Não foi possível excluir o treino.', 'danger');
     }
   };
 
