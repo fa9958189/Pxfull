@@ -342,6 +342,18 @@ const WorkoutRoutine = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL, pushTo
   const [createReminder, setCreateReminder] = useState(false);
   const [sessionReminder, setSessionReminder] = useState(false);
 
+  const muscleMap = useMemo(
+    () =>
+      MUSCLE_GROUPS.reduce(
+        (acc, group) => ({
+          ...acc,
+          [group.value]: group,
+        }),
+        {}
+      ),
+    []
+  );
+
   const progressStats = useMemo(() => {
     const today = new Date();
     const year = today.getFullYear();
@@ -396,7 +408,7 @@ const WorkoutRoutine = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL, pushTo
       }
     });
 
-    // Músculo mais trabalhado (usa progress.byMuscleGroup)
+    // Músculo mais trabalhado (usa progress.byMuscleGroup e muscleMap)
     let mostWorkedMuscleKey = null;
     let mostWorkedMuscleLabel = null;
     let mostWorkedMuscleCount = 0;
@@ -469,18 +481,6 @@ const WorkoutRoutine = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL, pushTo
       bestWeekdayCount,
     };
   }, [sessions, progress, muscleMap]);
-
-  const muscleMap = useMemo(
-    () =>
-      MUSCLE_GROUPS.reduce(
-        (acc, group) => ({
-          ...acc,
-          [group.value]: group,
-        }),
-        {}
-      ),
-    []
-  );
 
   const sportsMap = useMemo(
     () =>
