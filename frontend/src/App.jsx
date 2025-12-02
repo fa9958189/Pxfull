@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import WorkoutRoutine from './components/WorkoutRoutine.jsx';
+import FoodDiary from './components/FoodDiary.jsx';
 import './styles.css';
 
 const currencyFormatter = new Intl.NumberFormat('pt-BR', {
@@ -1094,6 +1095,13 @@ function App() {
         >
           Rotina de Treino
         </button>
+
+        <button
+          className={activeView === 'foodDiary' ? 'tab active' : 'tab'}
+          onClick={() => setActiveView('foodDiary')}
+        >
+          Diário alimentar
+        </button>
       </div>
 
       {activeView === 'transactions' && (
@@ -1256,13 +1264,17 @@ function App() {
 
       {activeView === 'workout' && (
         <div className="container single-card">
-          <div className="grid-agenda">
-            <WorkoutRoutine
-              apiBaseUrl={workoutApiBase}
-              profileId={profile?.id || session?.user?.id}
-              pushToast={pushToast}
-            />
-          </div>
+          <section className="card">
+            <WorkoutRoutine apiBaseUrl={workoutApiBase} pushToast={pushToast} />
+          </section>
+        </div>
+      )}
+
+      {activeView === 'foodDiary' && (
+        <div className="container single-card">
+          <section className="card">
+            <FoodDiary userId={session.user.id} />
+          </section>
         </div>
       )}
     </>
