@@ -453,13 +453,15 @@ const Reports = ({ transactions }) => {
 
     let maxExpense = entries[0];
     let minExpense = entries[0];
+    let maxIncome = entries[0];
 
     entries.forEach((item) => {
       if (item.expense > maxExpense.expense) maxExpense = item;
       if (item.expense < minExpense.expense) minExpense = item;
+      if (item.income > maxIncome.income) maxIncome = item;
     });
 
-    return { entries, maxExpense, minExpense };
+    return { entries, maxExpense, minExpense, maxIncome };
   }, [monthlyData]);
 
   useEffect(() => {
@@ -610,11 +612,10 @@ const Reports = ({ transactions }) => {
             </div>
 
             <div className="kpi">
-              <small>Mês com MENOR despesa</small>
-              <strong>{formatMonthLabel(monthStats.minExpense.monthKey)}</strong>
+              <small>Mês com MAIOR receita</small>
+              <strong>{formatMonthLabel(monthStats.maxIncome?.monthKey)}</strong>
               <p className="muted" style={{ marginTop: 4, fontSize: 13 }}>
-                Total de despesas:{' '}
-                {formatCurrency(monthStats.minExpense.expense)}
+                Total de receitas: {formatCurrency(monthStats.maxIncome?.income || 0)}
               </p>
             </div>
           </div>
