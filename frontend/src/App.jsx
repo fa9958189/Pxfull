@@ -383,7 +383,7 @@ const Reports = ({ transactions }) => {
   const monthlyData = useMemo(() => {
     const map = {};
     transactions.forEach((tx) => {
-      const month = (tx.date || '').slice(0, 7);
+      const month = (tx.date || '').slice(0, 7); // YYYY-MM
       if (!month) return;
       if (!map[month]) map[month] = { income: 0, expense: 0 };
       map[month][tx.type] += Number(tx.amount || 0);
@@ -392,7 +392,7 @@ const Reports = ({ transactions }) => {
     return {
       labels: entries.map(([month]) => month),
       income: entries.map(([, values]) => values.income),
-      expense: entries.map(([, values]) => values.expense)
+      expense: entries.map(([, values]) => values.expense),
     };
   }, [transactions]);
 
@@ -419,17 +419,76 @@ const Reports = ({ transactions }) => {
   }, [transactions]);
 
   const balancePoints = useMemo(() => {
-    const sorted = [...transactions].sort((a, b) => new Date(a.date) - new Date(b.date));
+    const sorted = [...transactions].sort(
+      (a, b) => new Date(a.date) - new Date(b.date)
+    );
     let acc = 0;
     return sorted.map((tx) => {
-      acc += tx.type === 'income' ? Number(tx.amount || 0) : -Number(tx.amount || 0);
+      acc += tx.type === 'income'
+        ? Number(tx.amount || 0)
+        : -Number(tx.amount || 0);
       return {
         date: tx.date,
-        balance: acc
+        balance: acc,
       };
     });
   }, [transactions]);
 
+  // ---------------- NOVO BLOCO: resumo mensal + comparação ----------------
+  const [selectedMonth, setSelectedMonth] = useState('');
+
+  const monthStats = useMemo(() => {
+    if (!monthlyData.labels.length) return null;
+
+    const entries = monthlyData.labels.map((monthKey, index) => {
+      const income = monthlyData.income[index] || 0;
+      const expense = monthlyData.expense[index] || 0;
+      return {
+        monthKey,
+        income,
+        expense,
+        balance: income - expense,
+      };
+    });
+
+    let maxExpense = entries[0];
+    let minExpense = entries[0];
+
+    entries.forEach((item) => {
+      if (item.expense > maxExpense.expense) maxExpense = item;
+      if (item.expense < minExpense.expense) minExpense = item;
+    });
+
+    return { entries, maxExpense, minExpense };
+  }, [monthlyData]);
+
+  useEffect(() => {
+    if (!selectedMonth && monthlyData.labels.length) {
+      // por padrão, seleciona o mês mais recente
+      setSelectedMonth(monthlyData.labels[monthlyData.labels.length - 1]);
+    }
+  }, [selectedMonth, monthlyData.labels]);
+
+  const selectedMonthEntry = useMemo(() => {
+    if (!monthStats || !selectedMonth) return null;
+    return (
+      monthStats.entries.find((item) => item.monthKey === selectedMonth) || null
+    );
+  }, [monthStats, selectedMonth]);
+
+  const formatMonthLabel = (monthKey) => {
+    if (!monthKey) return '';
+    const [year, month] = monthKey.split('-').map(Number);
+    if (!year || !month) return monthKey;
+    const date = new Date(year, month - 1, 1);
+    return date.toLocaleDateString('pt-BR', {
+      month: 'short',
+      year: 'numeric',
+    });
+  };
+  // ------------------------------------------------------------------------
+
+  // GRÁFICOS JÁ EXISTENTES (mantidos)
   useChart('chartLine', {
     type: 'line',
     data: {
@@ -439,23 +498,23 @@ const Reports = ({ transactions }) => {
           label: 'Receitas',
           data: monthlyData.income,
           borderColor: '#4ade80',
-          tension: 0.3
+          tension: 0.3,
         },
         {
           label: 'Despesas',
           data: monthlyData.expense,
           borderColor: '#ef4444',
-          tension: 0.3
-        }
-      ]
+          tension: 0.3,
+        },
+      ],
     },
     options: {
       plugins: { legend: { labels: { color: '#e5e7eb' } } },
       scales: {
         x: { ticks: { color: '#aab2c0' }, grid: { color: '#1f2434' } },
-        y: { ticks: { color: '#aab2c0' }, grid: { color: '#1f2434' } }
-      }
-    }
+        y: { ticks: { color: '#aab2c0' }, grid: { color: '#1f2434' } },
+      },
+    },
   });
 
   useChart('chartPie', {
@@ -465,10 +524,17 @@ const Reports = ({ transactions }) => {
       datasets: [
         {
           data: Object.values(expenseByCat),
-          backgroundColor: ['#f87171', '#fb923c', '#facc15', '#34d399', '#38bdf8', '#a78bfa']
-        }
-      ]
-    }
+          backgroundColor: [
+            '#f87171',
+            '#fb923c',
+            '#facc15',
+            '#34d399',
+            '#38bdf8',
+            '#a78bfa',
+          ],
+        },
+      ],
+    },
   });
 
   useChart('chartIncomeCat', {
@@ -478,17 +544,17 @@ const Reports = ({ transactions }) => {
       datasets: [
         {
           data: Object.values(incomeByCat),
-          backgroundColor: '#4ade80'
-        }
-      ]
+          backgroundColor: '#4ade80',
+        },
+      ],
     },
     options: {
       plugins: { legend: { display: false } },
       scales: {
         x: { ticks: { color: '#aab2c0' }, grid: { color: '#1f2434' } },
-        y: { ticks: { color: '#aab2c0' }, grid: { color: '#1f2434' } }
-      }
-    }
+        y: { ticks: { color: '#aab2c0' }, grid: { color: '#1f2434' } },
+      },
+    },
   });
 
   useChart('chartBalance', {
@@ -499,17 +565,17 @@ const Reports = ({ transactions }) => {
         {
           data: balancePoints.map((point) => point.balance),
           borderColor: '#60a5fa',
-          fill: false
-        }
-      ]
+          fill: false,
+        },
+      ],
     },
     options: {
       plugins: { legend: { display: false } },
       scales: {
         x: { ticks: { color: '#aab2c0' }, grid: { color: '#1f2434' } },
-        y: { ticks: { color: '#aab2c0' }, grid: { color: '#1f2434' } }
-      }
-    }
+        y: { ticks: { color: '#aab2c0' }, grid: { color: '#1f2434' } },
+      },
+    },
   });
 
   return (
@@ -517,6 +583,60 @@ const Reports = ({ transactions }) => {
       <p className="muted">
         Os gráficos respeitam os filtros aplicados acima. Clique em <b>Filtrar</b> para atualizar.
       </p>
+
+      {/* NOVO: resumo mensal + seletor de mês + comparação entre meses */}
+      {monthStats && (
+        <>
+          <div className="summary" style={{ marginBottom: 16 }}>
+            <div className="kpi">
+              <small>Mês selecionado</small>
+              <strong>{formatMonthLabel(selectedMonth) || '-'}</strong>
+              {selectedMonthEntry && (
+                <p className="muted" style={{ marginTop: 4, fontSize: 13 }}>
+                  Receitas: {formatCurrency(selectedMonthEntry.income)} •{' '}
+                  Despesas: {formatCurrency(selectedMonthEntry.expense)} •{' '}
+                  Saldo: {formatCurrency(selectedMonthEntry.balance)}
+                </p>
+              )}
+            </div>
+
+            <div className="kpi">
+              <small>Mês com MAIOR despesa</small>
+              <strong>{formatMonthLabel(monthStats.maxExpense.monthKey)}</strong>
+              <p className="muted" style={{ marginTop: 4, fontSize: 13 }}>
+                Total de despesas:{' '}
+                {formatCurrency(monthStats.maxExpense.expense)}
+              </p>
+            </div>
+
+            <div className="kpi">
+              <small>Mês com MENOR despesa</small>
+              <strong>{formatMonthLabel(monthStats.minExpense.monthKey)}</strong>
+              <p className="muted" style={{ marginTop: 4, fontSize: 13 }}>
+                Total de despesas:{' '}
+                {formatCurrency(monthStats.minExpense.expense)}
+              </p>
+            </div>
+          </div>
+
+          <div style={{ marginBottom: 16 }}>
+            <label>Mudar mês para detalhar</label>
+            <select
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(e.target.value)}
+              style={{ maxWidth: 260 }}
+            >
+              {monthlyData.labels.map((monthKey) => (
+                <option key={monthKey} value={monthKey}>
+                  {formatMonthLabel(monthKey)}
+                </option>
+              ))}
+            </select>
+          </div>
+        </>
+      )}
+
+      {/* GRÁFICOS ORIGINAIS (mantidos) */}
       <div className="row">
         <div className="card" style={{ flex: 1 }}>
           <h3 className="title">Receitas x Despesas (por mês)</h3>
