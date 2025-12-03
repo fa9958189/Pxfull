@@ -45,6 +45,82 @@ const SPORTS = muscleGroups.slice(8).map(({ id, name, image }) => ({
   image
 }));
 
+const MUSCLE_INFO = {
+  peito: {
+    title: 'Peito',
+    description:
+      'Grupo muscular responsável por empurrar carga à frente do corpo, muito usado em supino, flexões e movimentos de empurrar no dia a dia.'
+  },
+  costas: {
+    title: 'Costas',
+    description:
+      'Importante para postura e força de puxar. Trabalha bastante em puxadas, remadas e exercícios que trazem a carga em direção ao corpo.'
+  },
+  ombros: {
+    title: 'Ombros',
+    description:
+      'Envolvidos em praticamente todos os movimentos de braço. Fortalecer ombros ajuda na estabilidade e evita lesões em outros exercícios.'
+  },
+  biceps: {
+    title: 'Bíceps',
+    description:
+      'Músculo da parte da frente do braço, responsável por flexionar o cotovelo. Muito ativado em roscas e movimentos de puxar.'
+  },
+  triceps: {
+    title: 'Tríceps',
+    description:
+      'Músculo da parte de trás do braço, responsável por estender o cotovelo. É muito usado em paralelas, tríceps na polia e em todo movimento de empurrar.'
+  },
+  abdomen: {
+    title: 'Abdômen',
+    description:
+      'Conjunto de músculos que estabilizam o tronco. Essencial para postura, proteção da coluna e transferência de força entre membros superiores e inferiores.'
+  },
+  pernas: {
+    title: 'Pernas',
+    description:
+      'Inclui coxas e panturrilhas. Suportam o peso do corpo, ajudam na circulação e são muito exigidas em agachamentos, leg press e corridas.'
+  },
+  gluteos: {
+    title: 'Glúteos',
+    description:
+      'Músculos fortes que estabilizam o quadril e ajudam em agachamentos, subidas e corridas. Importantes tanto para força quanto para proteção da coluna.'
+  },
+};
+
+const SPORT_INFO = {
+  natacao: {
+    title: 'Natação',
+    description:
+      'Exercício de baixo impacto para articulações, ótimo para condicionamento cardiorrespiratório, fortalecimento geral e controle de peso.'
+  },
+  volei: {
+    title: 'Vôlei',
+    description:
+      'Trabalha impulsão, coordenação e agilidade, além de fortalecer pernas, ombros e core com saltos e movimentos rápidos.'
+  },
+  boxe: {
+    title: 'Boxe',
+    description:
+      'Atividade intensa que mistura condicionamento, velocidade e força. Queima muitas calorias e melhora reflexos e coordenação.'
+  },
+  jiujitsu: {
+    title: 'Jiu-Jitsu',
+    description:
+      'Arte marcial focada em alavancas e controle no solo. Desenvolve força, resistência, flexibilidade e raciocínio estratégico.'
+  },
+  futebol: {
+    title: 'Futebol',
+    description:
+      'Esporte completo para pernas e condicionamento. Trabalha corrida, mudanças rápidas de direção e coordenação com a bola.'
+  },
+  beachtennis: {
+    title: 'Beach Tennis',
+    description:
+      'Esporte de areia que exige pernas, core e braços. Ótimo para resistência, agilidade e queima calórica com baixo impacto.'
+  },
+};
+
 const getMuscleGroupByLabel = (label) => {
   const normalized = String(label || '').toLowerCase();
   return MUSCLE_GROUPS.find(
@@ -168,6 +244,9 @@ const ViewWorkoutModal = ({
   onChangeDuration,
   onStart,
 }) => {
+  // novo estado para o “detalhe” selecionado
+  const [infoTarget, setInfoTarget] = useState(null);
+
   // Modal de visualização de treino
   if (!open || !workout) return null;
 
@@ -225,8 +304,24 @@ const ViewWorkoutModal = ({
                 {muscleGroups.length > 0 ? (
                   muscleGroups.map((mg) => {
                     const def = getMuscleGroupByLabel(mg) || muscleMap[mg];
+                    const key = (def?.value || mg || '').toString().toLowerCase();
+                    const info = MUSCLE_INFO[key];
+
                     return (
-                      <div key={mg} className="chip chip-with-image">
+                      <div
+                        key={mg}
+                        className="chip chip-with-image"
+                        style={{ cursor: info ? 'pointer' : 'default' }}
+                        onClick={() => {
+                          if (!info) return;
+                          setInfoTarget({
+                            type: 'muscle',
+                            id: key,
+                            label: def?.label || mg,
+                            description: info.description,
+                          });
+                        }}
+                      >
                         {def?.image && (
                           <img
                             src={def.image}
@@ -250,8 +345,24 @@ const ViewWorkoutModal = ({
                 {sportsActivities.length > 0 ? (
                   sportsActivities.map((act) => {
                     const def = getSportByLabel(act) || sportsMap[act];
+                    const key = (def?.value || act || '').toString().toLowerCase();
+                    const info = SPORT_INFO[key];
+
                     return (
-                      <div key={act} className="chip chip-with-image">
+                      <div
+                        key={act}
+                        className="chip chip-with-image"
+                        style={{ cursor: info ? 'pointer' : 'default' }}
+                        onClick={() => {
+                          if (!info) return;
+                          setInfoTarget({
+                            type: 'sport',
+                            id: key,
+                            label: def?.label || act,
+                            description: info.description,
+                          });
+                        }}
+                      >
                         {def?.image && (
                           <img
                             src={def.image}
@@ -286,6 +397,47 @@ const ViewWorkoutModal = ({
                   </li>
                 ))}
               </ul>
+            </div>
+          )}
+
+          {infoTarget && (
+            <div
+              className="info-panel"
+              style={{
+                marginTop: 16,
+                marginBottom: 24,
+                padding: 16,
+                borderRadius: 12,
+                border: '1px solid rgba(255,255,255,0.12)',
+                background: '#101522',
+              }}
+            >
+              <div
+                className="row"
+                style={{ justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}
+              >
+                <div>
+                  <div
+                    className="muted"
+                    style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.08 }}
+                  >
+                    {infoTarget.type === 'muscle'
+                      ? 'Grupo muscular selecionado'
+                      : 'Esporte / atividade selecionada'}
+                  </div>
+                  <div style={{ fontSize: 18, fontWeight: 600 }}>{infoTarget.label}</div>
+                </div>
+                <button
+                  type="button"
+                  className="ghost small"
+                  onClick={() => setInfoTarget(null)}
+                >
+                  Fechar descrição
+                </button>
+              </div>
+              <p className="muted" style={{ fontSize: 14, lineHeight: 1.5, margin: 0 }}>
+                {infoTarget.description}
+              </p>
             </div>
           )}
 
