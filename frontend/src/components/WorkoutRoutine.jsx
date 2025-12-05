@@ -17,6 +17,10 @@ import PeitoCrossoverGif from '../assets/exercise/peito/Crossover com pegada alt
 import PeitoSupinoInclinadoGif from '../assets/exercise/peito/Supino inclinado com halteres.gif';
 import PeitoSupinoRetoGif from '../assets/exercise/peito/Supino reto com barra.gif';
 import PeitoVoadorGif from '../assets/exercise/peito/Voador ou peck deck.gif';
+import CostasPulleyGif from '../assets/exercise/costas/Pulley costas.gif';
+import CostasRemadaBaixaGif from '../assets/exercise/costas/Remada baixa.gif';
+import CostasRemadaSerroteGif from '../assets/exercise/costas/Remada serrote.gif';
+import CostasVoadorInvertidoGif from '../assets/exercise/costas/Voador invertido.gif';
 
 const muscleGroups = [
   { id: 'peito', name: 'Peito', image: PeitoImg },
@@ -76,7 +80,25 @@ const MUSCLE_INFO = {
   costas: {
     title: 'Costas',
     description:
-      'Importante para postura e força de puxar. Trabalha bastante em puxadas, remadas e exercícios que trazem a carga em direção ao corpo.'
+      'Grupo muscular importante para postura, estabilidade e movimentos de puxar, muito trabalhado em remadas, puxadas e exercícios de tração.',
+    exercises: [
+      {
+        name: 'Pulley costas',
+        gif: CostasPulleyGif,
+      },
+      {
+        name: 'Remada baixa',
+        gif: CostasRemadaBaixaGif,
+      },
+      {
+        name: 'Remada serrote',
+        gif: CostasRemadaSerroteGif,
+      },
+      {
+        name: 'Voador invertido',
+        gif: CostasVoadorInvertidoGif,
+      },
+    ],
   },
   ombros: {
     title: 'Ombros',
