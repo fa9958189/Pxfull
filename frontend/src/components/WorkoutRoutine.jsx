@@ -21,6 +21,10 @@ import CostasPulleyGif from '../assets/exercise/costas/Pulley costas.gif';
 import CostasRemadaBaixaGif from '../assets/exercise/costas/Remada baixa.gif';
 import CostasRemadaSerroteGif from '../assets/exercise/costas/Remada serrote.gif';
 import CostasVoadorInvertidoGif from '../assets/exercise/costas/Voador invertido.gif';
+import OmbroArnoldPressGif from '../assets/exercise/ombro/Arnold press.gif';
+import OmbroCrucifixoInversoGif from '../assets/exercise/ombro/Crucifixo inverso.gif';
+import OmbroElevacaoFrontalGif from '../assets/exercise/ombro/Elevação frontal.gif';
+import OmbroElevacaoLateralGif from '../assets/exercise/ombro/Elevação lateral.gif';
 
 const muscleGroups = [
   { id: 'peito', name: 'Peito', image: PeitoImg },
@@ -103,7 +107,25 @@ const MUSCLE_INFO = {
   ombros: {
     title: 'Ombros',
     description:
-      'Envolvidos em praticamente todos os movimentos de braço. Fortalecer ombros ajuda na estabilidade e evita lesões em outros exercícios.'
+      'Envolvidos em praticamente todos os movimentos de braço. Fortalecer ombros ajuda na estabilidade e evita lesões em outros exercícios.',
+    exercises: [
+      {
+        name: 'Arnold press',
+        gif: OmbroArnoldPressGif,
+      },
+      {
+        name: 'Crucifixo inverso',
+        gif: OmbroCrucifixoInversoGif,
+      },
+      {
+        name: 'Elevação frontal',
+        gif: OmbroElevacaoFrontalGif,
+      },
+      {
+        name: 'Elevação lateral',
+        gif: OmbroElevacaoLateralGif,
+      },
+    ],
   },
   biceps: {
     title: 'Bíceps',
