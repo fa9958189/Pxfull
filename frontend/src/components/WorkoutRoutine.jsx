@@ -13,6 +13,7 @@ import BoxeImg from '../assets/muscles/Boxe.png';
 import JiuJitsuImg from '../assets/muscles/Jiu-jitsu.png';
 import FutebolImg from '../assets/muscles/Futebol.png';
 import BeachTennisImg from '../assets/muscles/beach tennis.png';
+import PeitoSupinoGif from '../assets/exercise/peito/Supino inclinado com halteres.gif';
 
 const muscleGroups = [
   { id: 'peito', name: 'Peito', image: PeitoImg },
@@ -49,7 +50,8 @@ const MUSCLE_INFO = {
   peito: {
     title: 'Peito',
     description:
-      'Grupo muscular responsável por empurrar carga à frente do corpo, muito usado em supino, flexões e movimentos de empurrar no dia a dia.'
+      'Grupo muscular responsável por empurrar carga à frente do corpo, muito usado em supino, flexões e movimentos de empurrar no dia a dia.',
+    gif: PeitoSupinoGif,
   },
   costas: {
     title: 'Costas',
@@ -319,6 +321,7 @@ const ViewWorkoutModal = ({
                             id: key,
                             label: def?.label || mg,
                             description: info.description,
+                            gif: info.gif || null,
                           });
                         }}
                       >
@@ -438,6 +441,21 @@ const ViewWorkoutModal = ({
               <p className="muted" style={{ fontSize: 14, lineHeight: 1.5, margin: 0 }}>
                 {infoTarget.description}
               </p>
+              {infoTarget.gif && (
+                <div style={{ marginTop: 12 }}>
+                  <img
+                    src={infoTarget.gif}
+                    alt={`Demonstração de exercício para ${infoTarget.label}`}
+                    style={{
+                      width: '100%',
+                      maxHeight: 260,
+                      objectFit: 'cover',
+                      borderRadius: 10,
+                      border: '1px solid rgba(255,255,255,0.15)',
+                    }}
+                  />
+                </div>
+              )}
             </div>
           )}
 
