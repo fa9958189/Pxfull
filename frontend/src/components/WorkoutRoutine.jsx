@@ -13,7 +13,10 @@ import BoxeImg from '../assets/muscles/Boxe.png';
 import JiuJitsuImg from '../assets/muscles/Jiu-jitsu.png';
 import FutebolImg from '../assets/muscles/Futebol.png';
 import BeachTennisImg from '../assets/muscles/beach tennis.png';
-import PeitoSupinoGif from '../assets/exercise/peito/Supino inclinado com halteres.gif';
+import PeitoCrossoverGif from '../assets/exercise/peito/Crossover com pegada alta.gif';
+import PeitoSupinoInclinadoGif from '../assets/exercise/peito/Supino inclinado com halteres.gif';
+import PeitoSupinoRetoGif from '../assets/exercise/peito/Supino reto com barra.gif';
+import PeitoVoadorGif from '../assets/exercise/peito/Voador ou peck deck.gif';
 
 const muscleGroups = [
   { id: 'peito', name: 'Peito', image: PeitoImg },
@@ -51,7 +54,24 @@ const MUSCLE_INFO = {
     title: 'Peito',
     description:
       'Grupo muscular responsável por empurrar carga à frente do corpo, muito usado em supino, flexões e movimentos de empurrar no dia a dia.',
-    gif: PeitoSupinoGif,
+    exercises: [
+      {
+        name: 'Supino inclinado com halteres',
+        gif: PeitoSupinoInclinadoGif,
+      },
+      {
+        name: 'Supino reto com barra',
+        gif: PeitoSupinoRetoGif,
+      },
+      {
+        name: 'Crossover com pegada alta',
+        gif: PeitoCrossoverGif,
+      },
+      {
+        name: 'Voador ou peck deck',
+        gif: PeitoVoadorGif,
+      },
+    ],
   },
   costas: {
     title: 'Costas',
@@ -321,7 +341,7 @@ const ViewWorkoutModal = ({
                             id: key,
                             label: def?.label || mg,
                             description: info.description,
-                            gif: info.gif || null,
+                            exercises: info.exercises || [],
                           });
                         }}
                       >
@@ -441,23 +461,40 @@ const ViewWorkoutModal = ({
               <p className="muted" style={{ fontSize: 14, lineHeight: 1.5, margin: 0 }}>
                 {infoTarget.description}
               </p>
-              {infoTarget.gif && (
-                <div style={{ marginTop: 12 }}>
-                    <img
-                      src={infoTarget.gif}
-                      alt={`Demonstração de exercício para ${infoTarget.label}`}
-                    style={{
-                      width: '70%',            // menor que antes
-                      maxWidth: '300px',       // tamanho ideal para desktop
-                      height: 'auto',
-                      display: 'block',
-                      margin: '16px auto 0',   // centralizado
-                      objectFit: 'contain',
-                      borderRadius: 10,
-                      border: '1px solid rgba(255,255,255,0.12)',
-                      backgroundColor: '#0b0e13',
-                    }}
-                  />
+              {infoTarget.exercises && infoTarget.exercises.length > 0 && (
+                <div style={{ marginTop: 16 }}>
+                  {infoTarget.exercises.map((ex, index) => (
+                    <div key={index} style={{ marginBottom: 24, textAlign: 'center' }}>
+                      {/* Nome do exercício */}
+                      <div
+                        style={{
+                          fontSize: 14,
+                          fontWeight: 600,
+                          marginBottom: 8,
+                          color: '#e5e7eb',
+                        }}
+                      >
+                        {ex.name}
+                      </div>
+
+                      {/* GIF do exercício */}
+                      <img
+                        src={ex.gif}
+                        alt={ex.name}
+                        style={{
+                          width: '70%',
+                          maxWidth: '300px',
+                          height: 'auto',
+                          display: 'block',
+                          margin: '8px auto 0',
+                          objectFit: 'contain',
+                          borderRadius: 10,
+                          border: '1px solid rgba(255,255,255,0.12)',
+                          backgroundColor: '#0b0e13',
+                        }}
+                      />
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
