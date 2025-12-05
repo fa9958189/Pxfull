@@ -30,6 +30,10 @@ import OmbroArnoldPressGif from '../assets/exercise/ombro/Arnold press.gif';
 import OmbroCrucifixoInversoGif from '../assets/exercise/ombro/Crucifixo inverso.gif';
 import OmbroElevacaoFrontalGif from '../assets/exercise/ombro/Elevação frontal.gif';
 import OmbroElevacaoLateralGif from '../assets/exercise/ombro/Elevação lateral.gif';
+import TricepsExtensaoGif from '../assets/exercise/triceps/Extensão de tríceps deitado.gif';
+import TricepsMergulhoGif from '../assets/exercise/triceps/Mergulho na máquina.gif';
+import TricepsPoliaAltaGif from '../assets/exercise/triceps/Polia alta com corda.gif';
+import TricepsCoiceGif from '../assets/exercise/triceps/Tríceps coice.gif';
 
 const muscleGroups = [
   { id: 'peito', name: 'Peito', image: PeitoImg },
@@ -147,7 +151,13 @@ const MUSCLE_INFO = {
   triceps: {
     title: 'Tríceps',
     description:
-      'Músculo da parte de trás do braço, responsável por estender o cotovelo. É muito usado em paralelas, tríceps na polia e em todo movimento de empurrar.'
+      'Músculo responsável pela extensão do cotovelo, muito ativado em empurrões, mergulho na máquina, polia alta e movimentos de coice.',
+    exercises: [
+      { name: 'Extensão de tríceps deitado', gif: TricepsExtensaoGif },
+      { name: 'Mergulho na máquina', gif: TricepsMergulhoGif },
+      { name: 'Polia alta com corda', gif: TricepsPoliaAltaGif },
+      { name: 'Tríceps coice', gif: TricepsCoiceGif },
+    ],
   },
   abdomen: {
     title: 'Abdômen',
