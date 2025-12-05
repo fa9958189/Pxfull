@@ -448,10 +448,14 @@ const ViewWorkoutModal = ({
                     alt={`Demonstração de exercício para ${infoTarget.label}`}
                     style={{
                       width: '100%',
-                      maxHeight: 260,
-                      objectFit: 'cover',
+                      maxWidth: '640px',
+                      height: 'auto',
+                      display: 'block',
+                      margin: '8px auto 0',
+                      objectFit: 'contain',
                       borderRadius: 10,
                       border: '1px solid rgba(255,255,255,0.15)',
+                      backgroundColor: '#05070c',
                     }}
                   />
                 </div>
