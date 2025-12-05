@@ -443,17 +443,17 @@ const ViewWorkoutModal = ({
               </p>
               {infoTarget.gif && (
                 <div style={{ marginTop: 12 }}>
-                  <img
-                    src={infoTarget.gif}
-                    alt={`Demonstração de exercício para ${infoTarget.label}`}
+                    <img
+                      src={infoTarget.gif}
+                      alt={`Demonstração de exercício para ${infoTarget.label}`}
                     style={{
-                      width: '80%',            // deixa menor visualmente
-                      maxWidth: '360px',       // limite elegante para desktop
-                      height: 'auto',          // mantém proporção
+                      width: '70%',            // menor que antes
+                      maxWidth: '300px',       // tamanho ideal para desktop
+                      height: 'auto',
                       display: 'block',
-                      margin: '16px auto 0',   // centraliza e dá respiro
-                      objectFit: 'contain',    // não corta nada
-                      borderRadius: 12,
+                      margin: '16px auto 0',   // centralizado
+                      objectFit: 'contain',
+                      borderRadius: 10,
                       border: '1px solid rgba(255,255,255,0.12)',
                       backgroundColor: '#0b0e13',
                     }}
