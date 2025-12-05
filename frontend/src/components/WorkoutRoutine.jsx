@@ -17,6 +17,11 @@ import PeitoCrossoverGif from '../assets/exercise/peito/Crossover com pegada alt
 import PeitoSupinoInclinadoGif from '../assets/exercise/peito/Supino inclinado com halteres.gif';
 import PeitoSupinoRetoGif from '../assets/exercise/peito/Supino reto com barra.gif';
 import PeitoVoadorGif from '../assets/exercise/peito/Voador ou peck deck.gif';
+import BicepsBasicoGif from '../assets/exercise/biceps/bíceps.gif';
+import BicepsRoscaConcentradaGif from '../assets/exercise/biceps/Rosca concentrada.gif';
+import BicepsRoscaInclinadaGif from '../assets/exercise/biceps/Rosca inclinada.gif';
+import BicepsRoscaMarteloGif from '../assets/exercise/biceps/Rosca martelo.gif';
+import BicepsRoscaScottGif from '../assets/exercise/biceps/Rosca Scott.gif';
 import CostasPulleyGif from '../assets/exercise/costas/Pulley costas.gif';
 import CostasRemadaBaixaGif from '../assets/exercise/costas/Remada baixa.gif';
 import CostasRemadaSerroteGif from '../assets/exercise/costas/Remada serrote.gif';
@@ -81,6 +86,18 @@ const MUSCLE_INFO = {
       },
     ],
   },
+  biceps: {
+    title: 'Bíceps',
+    description:
+      'Músculo da parte da frente do braço, responsável por flexionar o cotovelo. Muito ativado em roscas e movimentos de puxar.',
+    exercises: [
+      { name: 'Bíceps', gif: BicepsBasicoGif },
+      { name: 'Rosca concentrada', gif: BicepsRoscaConcentradaGif },
+      { name: 'Rosca inclinada', gif: BicepsRoscaInclinadaGif },
+      { name: 'Rosca martelo', gif: BicepsRoscaMarteloGif },
+      { name: 'Rosca Scott', gif: BicepsRoscaScottGif },
+    ],
+  },
   costas: {
     title: 'Costas',
     description:
@@ -126,11 +143,6 @@ const MUSCLE_INFO = {
         gif: OmbroElevacaoLateralGif,
       },
     ],
-  },
-  biceps: {
-    title: 'Bíceps',
-    description:
-      'Músculo da parte da frente do braço, responsável por flexionar o cotovelo. Muito ativado em roscas e movimentos de puxar.'
   },
   triceps: {
     title: 'Tríceps',
