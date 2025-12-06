@@ -38,6 +38,11 @@ import AbdomenInfraGif from "../assets/exercise/abdomen/Abdominal infra nas para
 import AbdomenMaquinaGif from "../assets/exercise/abdomen/Abdominal na máquina.gif";
 import AbdomenPoliaGif from "../assets/exercise/abdomen/Abdominal na polia.gif";
 import AbdomenRetoGif from "../assets/exercise/abdomen/Abdominal reto (tradicional).gif";
+import PernasAgachamentoBulgaroGif from "../assets/exercise/Quadríceps/Agachamento búlgaro.gif";
+import PernasAgachamentoHackGif from "../assets/exercise/Quadríceps/Agachamento hack.gif";
+import PernasCadeiraExtensoraGif from "../assets/exercise/Quadríceps/Cadeira extensora.gif";
+import PernasLegPressGif from "../assets/exercise/Quadríceps/Leg press.gif";
+import PernasPanturrilhaMaquinaGif from "../assets/exercise/Quadríceps/Panturrilha Sentado na Máquina.gif";
 
 const muscleGroups = [
   { id: 'peito', name: 'Peito', image: PeitoImg },
@@ -177,7 +182,14 @@ const MUSCLE_INFO = {
   pernas: {
     title: 'Pernas',
     description:
-      'Inclui coxas e panturrilhas. Suportam o peso do corpo, ajudam na circulação e são muito exigidas em agachamentos, leg press e corridas.'
+      'Inclui coxas e panturrilhas. Suportam o peso do corpo, ajudam na circulação e são muito exigidas em agachamentos, leg press e corridas.',
+    exercises: [
+      { name: 'Agachamento búlgaro', gif: PernasAgachamentoBulgaroGif },
+      { name: 'Agachamento hack', gif: PernasAgachamentoHackGif },
+      { name: 'Cadeira extensora', gif: PernasCadeiraExtensoraGif },
+      { name: 'Leg press', gif: PernasLegPressGif },
+      { name: 'Panturrilha Sentado na Máquina', gif: PernasPanturrilhaMaquinaGif },
+    ],
   },
   gluteos: {
     title: 'Glúteos',
@@ -538,39 +550,28 @@ const ViewWorkoutModal = ({
                 {infoTarget.description}
               </p>
               {infoTarget.exercises && infoTarget.exercises.length > 0 && (
-                <div style={{ marginTop: 16 }}>
-                  {infoTarget.exercises.map((ex, index) => (
-                    <div key={index} style={{ marginBottom: 24, textAlign: 'center' }}>
-                      {/* Nome do exercício */}
-                      <div
-                        style={{
-                          fontSize: 14,
-                          fontWeight: 600,
-                          marginBottom: 8,
-                          color: '#e5e7eb',
-                        }}
-                      >
-                        {ex.name}
-                      </div>
+                <div style={{ marginTop: '20px' }}>
+                  {infoTarget.exercises.map((ex, index) => {
+                    const gifSrc = ex.gif || (ex.file ? `/src/assets/exercise/Quadríceps/${ex.file}` : '');
 
-                      {/* GIF do exercício */}
-                      <img
-                        src={ex.gif}
-                        alt={ex.name}
-                        style={{
-                          width: '70%',
-                          maxWidth: '300px',
-                          height: 'auto',
-                          display: 'block',
-                          margin: '8px auto 0',
-                          objectFit: 'contain',
-                          borderRadius: 10,
-                          border: '1px solid rgba(255,255,255,0.12)',
-                          backgroundColor: '#0b0e13',
-                        }}
-                      />
-                    </div>
-                  ))}
+                    return (
+                      <div key={index} style={{ marginBottom: '30px' }}>
+                        <h3 style={{ marginBottom: '10px' }}>{ex.name}</h3>
+                        <img
+                          src={gifSrc}
+                          alt={ex.name}
+                          style={{
+                            width: '100%',
+                            maxWidth: '320px',
+                            height: 'auto',
+                            borderRadius: '10px',
+                            display: 'block',
+                            margin: '0 auto'
+                          }}
+                        />
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>
