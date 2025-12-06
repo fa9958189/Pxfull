@@ -43,10 +43,10 @@ import PernasAgachamentoHackGif from "../assets/exercise/Quadríceps/Agachamento
 import PernasCadeiraExtensoraGif from "../assets/exercise/Quadríceps/Cadeira extensora.gif";
 import PernasLegPressGif from "../assets/exercise/Quadríceps/Leg press.gif";
 import PernasPanturrilhaMaquinaGif from "../assets/exercise/Quadríceps/Panturrilha Sentado na Máquina.gif";
-import GluteoFlexoraDeitadaGif from "../assets/exercise/glúteo/Flexora deitada.gif";
-import GluteoNoCaboGif from "../assets/exercise/glúteo/Glúteos no Cabo.gif";
-import GluteoLevantamentoTerraGif from "../assets/exercise/glúteo/Levantamento terra.gif";
-import GluteoStiffGif from "../assets/exercise/glúteo/Stiff.gif";
+import GluteoFlexoraDeitadaGif from "../assets/exercise/gluteo/Flexora deitada.gif";
+import GluteoNoCaboGif from "../assets/exercise/gluteo/Glúteos no Cabo.gif";
+import GluteoLevantamentoTerraGif from "../assets/exercise/gluteo/Levantamento terra.gif";
+import GluteoStiffGif from "../assets/exercise/gluteo/Stiff.gif";
 
 const muscleGroups = [
   { id: 'peito', name: 'Peito', image: PeitoImg },
