@@ -34,6 +34,10 @@ import TricepsExtensaoGif from "../assets/exercise/triceps/Extensao triceps deit
 import TricepsMergulhoGif from "../assets/exercise/triceps/Mergulho na máquina.gif";
 import TricepsPoliaAltaGif from "../assets/exercise/triceps/Polia alta com corda.gif";
 import TricepsCoiceGif from "../assets/exercise/triceps/Tríceps coice.gif";
+import AbdomenInfraGif from "../assets/exercise/abdomen/Abdominal infra nas paralelas.gif";
+import AbdomenMaquinaGif from "../assets/exercise/abdomen/Abdominal na máquina.gif";
+import AbdomenPoliaGif from "../assets/exercise/abdomen/Abdominal na polia.gif";
+import AbdomenRetoGif from "../assets/exercise/abdomen/Abdominal reto (tradicional).gif";
 
 const muscleGroups = [
   { id: 'peito', name: 'Peito', image: PeitoImg },
@@ -162,7 +166,13 @@ const MUSCLE_INFO = {
   abdomen: {
     title: 'Abdômen',
     description:
-      'Conjunto de músculos que estabilizam o tronco. Essencial para postura, proteção da coluna e transferência de força entre membros superiores e inferiores.'
+      'Grupo muscular responsável pela estabilização do tronco e postura. Muito ativado em exercícios de flexão do tronco, máquinas, polias e movimentos de suspensão.',
+    exercises: [
+      { name: 'Abdominal infra nas paralelas', gif: AbdomenInfraGif },
+      { name: 'Abdominal na máquina', gif: AbdomenMaquinaGif },
+      { name: 'Abdominal na polia', gif: AbdomenPoliaGif },
+      { name: 'Abdominal reto (tradicional)', gif: AbdomenRetoGif },
+    ],
   },
   pernas: {
     title: 'Pernas',
