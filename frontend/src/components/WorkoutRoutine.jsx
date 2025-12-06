@@ -43,6 +43,10 @@ import PernasAgachamentoHackGif from "../assets/exercise/Quadríceps/Agachamento
 import PernasCadeiraExtensoraGif from "../assets/exercise/Quadríceps/Cadeira extensora.gif";
 import PernasLegPressGif from "../assets/exercise/Quadríceps/Leg press.gif";
 import PernasPanturrilhaMaquinaGif from "../assets/exercise/Quadríceps/Panturrilha Sentado na Máquina.gif";
+import GluteoFlexoraDeitadaGif from "../assets/exercise/glúteo/Flexora deitada.gif";
+import GluteoNoCaboGif from "../assets/exercise/glúteo/Glúteos no Cabo.gif";
+import GluteoLevantamentoTerraGif from "../assets/exercise/glúteo/Levantamento terra.gif";
+import GluteoStiffGif from "../assets/exercise/glúteo/Stiff.gif";
 
 const muscleGroups = [
   { id: 'peito', name: 'Peito', image: PeitoImg },
@@ -194,7 +198,13 @@ const MUSCLE_INFO = {
   gluteos: {
     title: 'Glúteos',
     description:
-      'Músculos fortes que estabilizam o quadril e ajudam em agachamentos, subidas e corridas. Importantes tanto para força quanto para proteção da coluna.'
+      'Músculos fortes que estabilizam o quadril e ajudam em agachamentos, subidas, corridas e levantamento terra. Importantes para força, potência e proteção da coluna.',
+    exercises: [
+      { name: 'Flexora deitada', gif: GluteoFlexoraDeitadaGif },
+      { name: 'Glúteos no cabo', gif: GluteoNoCaboGif },
+      { name: 'Levantamento terra', gif: GluteoLevantamentoTerraGif },
+      { name: 'Stiff', gif: GluteoStiffGif },
+    ],
   },
 };
 
