@@ -107,6 +107,8 @@ function FoodDiary({ userId }) {
     notes: ''
   });
 
+  const [editingId, setEditingId] = useState(null);
+
   const [isFoodPickerOpen, setIsFoodPickerOpen] = useState(false);
 
   // Salva no localStorage sempre que algo muda
@@ -165,8 +167,15 @@ function FoodDiary({ userId }) {
       return;
     }
 
+    const isEditing = Boolean(editingId);
+    const existingEntry = isEditing
+      ? dayEntries.find((e) => e.id === editingId)
+      : null;
+
     const payload = {
-      id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()),
+      id: isEditing
+        ? editingId
+        : (crypto.randomUUID ? crypto.randomUUID() : String(Date.now())),
       mealType: form.mealType,
       food: form.food,
       quantity: form.quantity,
@@ -175,26 +184,64 @@ function FoodDiary({ userId }) {
       waterMl: form.waterMl ? Number(form.waterMl) : 0,
       time: form.time,
       notes: form.notes,
-      createdAt: new Date().toISOString()
+      date: existingEntry?.date || selectedDate,
+      createdAt: existingEntry?.createdAt || new Date().toISOString()
     };
 
     setEntriesByDate((prev) => {
       const existing = prev[selectedDate] || [];
+      let updated;
+
+      if (isEditing) {
+        updated = existing.map((item) =>
+          item.id === editingId ? { ...item, ...payload } : item
+        );
+      } else {
+        updated = [payload, ...existing];
+      }
+
       return {
         ...prev,
-        [selectedDate]: [payload, ...existing]
+        [selectedDate]: updated
       };
     });
 
-    setForm((prev) => ({
-      ...prev,
+    setForm({
+      mealType: 'Almoço',
       food: '',
       quantity: '',
       calories: '',
       protein: '',
       waterMl: '',
+      time: '',
       notes: ''
-    }));
+    });
+    setEditingId(null);
+  };
+
+  const handleEditEntry = (entry) => {
+    setEditingId(entry.id);
+    setForm({
+      mealType: entry.mealType || 'Almoço',
+      food: entry.food || '',
+      quantity: entry.quantity || '',
+      calories: entry.calories != null ? String(entry.calories) : '',
+      protein: entry.protein != null ? String(entry.protein) : '',
+      waterMl: entry.waterMl != null ? String(entry.waterMl) : '',
+      time: entry.time || '',
+      notes: entry.notes || ''
+    });
+  };
+
+  const handleDeleteEntry = (entryId) => {
+    setEntriesByDate((prev) => {
+      const existing = prev[selectedDate] || [];
+      const updated = existing.filter((item) => item.id !== entryId);
+      return {
+        ...prev,
+        [selectedDate]: updated
+      };
+    });
   };
 
   const handleGoalChange = (field, value) => {
@@ -398,8 +445,12 @@ function FoodDiary({ userId }) {
                 <div className="food-diary-entry-header">
                   <span>
                     <strong>{item.mealType}</strong>{' '}
-                    {item.time && (
-                      <span className="muted">– {item.time}</span>
+                    {item.time && <span className="muted">– {item.time}</span>}
+                    {(item.date || selectedDate) && (
+                      <span className="muted">
+                        {' '}
+                        • {new Date(item.date || selectedDate).toLocaleDateString('pt-BR')}
+                      </span>
                     )}
                   </span>
                   <span>{formatNumber(item.calories, 0)} kcal</span>
@@ -425,6 +476,29 @@ function FoodDiary({ userId }) {
                     {item.notes}
                   </div>
                 )}
+                <div
+                  className="food-diary-entry-actions"
+                  style={{ marginTop: 6, display: 'flex', justifyContent: 'flex-end' }}
+                >
+                  <div className="table-actions">
+                    <button
+                      type="button"
+                      className="icon-button"
+                      onClick={() => handleEditEntry(item)}
+                      title="Editar refeição"
+                    >
+                      <span role="img" aria-label="Editar">✏️</span>
+                    </button>
+                    <button
+                      type="button"
+                      className="icon-button"
+                      onClick={() => handleDeleteEntry(item.id)}
+                      title="Excluir refeição"
+                    >
+                      <span role="img" aria-label="Excluir">🗑️</span>
+                    </button>
+                  </div>
+                </div>
               </div>
             ))}
           </div>
