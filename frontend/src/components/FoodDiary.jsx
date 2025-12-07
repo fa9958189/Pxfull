@@ -57,7 +57,7 @@ const writeToStorage = (userKey, state) => {
       entriesByDate: state.entriesByDate,
       goals: state.goals,
       body: state.body,
-      weightHistory: state.weightHistory || []
+      weightHistory: state.weightHistory || defaultWeightHistory
     };
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
   } catch (err) {
@@ -210,23 +210,22 @@ function FoodDiary({ userId }) {
       [field]: value
     }));
 
-    // sempre que mudar o peso, registra no histórico
+    // Sempre que mudar o peso, registra no histórico
     if (field === 'weightKg') {
       const numeric = value === '' ? null : Number(value);
 
       if (numeric) {
         setWeightHistory((prev) => {
-          // mantém só um registro por dia
-          const filtered = prev.filter((entry) => entry.date !== selectedDate);
+          // remove registro antigo desse mesmo dia
+          const withoutToday = prev.filter((entry) => entry.date !== selectedDate);
 
-          return [
-            ...filtered,
-            {
-              date: selectedDate, // data escolhida no diário
-              weightKg: numeric, // peso do dia
-              recordedAt: new Date().toISOString() // timestamp pra controle
-            }
-          ];
+          const newEntry = {
+            date: selectedDate,
+            weightKg: numeric,
+            recordedAt: new Date().toISOString()
+          };
+
+          return [...withoutToday, newEntry];
         });
       }
     }
@@ -551,6 +550,22 @@ function FoodDiary({ userId }) {
               <div className="muted" style={{ fontSize: 13 }}>
                 IMC:{' '}
                 <strong>{formatNumber(bmi.value, 1)}</strong> – {bmi.label}
+              </div>
+            )}
+
+            {weightHistory.length > 0 && (
+              <div className="muted" style={{ fontSize: 12, marginTop: 6 }}>
+                <div>Histórico de peso (recentes):</div>
+                {weightHistory
+                  .slice()
+                  .sort((a, b) => b.date.localeCompare(a.date))
+                  .slice(0, 5)
+                  .map((item) => (
+                    <div key={item.date}>
+                      {new Date(item.date).toLocaleDateString('pt-BR')} –{' '}
+                      {formatNumber(item.weightKg, 1)} kg
+                    </div>
+                  ))}
               </div>
             )}
           </div>
