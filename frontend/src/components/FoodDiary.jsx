@@ -6,7 +6,11 @@ import {
   saveMeal,
   updateMeal,
 } from '../foodDiaryApi';
-import { fetchWeightHistory, saveWeightEntry } from '../weightApi';
+import {
+  fetchWeightHistory,
+  saveWeightEntry,
+  saveWeightProfile,
+} from '../weightApi';
 
 const defaultGoals = {
   calories: 2000,
@@ -118,9 +122,16 @@ function FoodDiary({ userId, supabase, notify }) {
 
       try {
         setLoadingWeightHistory(true);
-        const history = await fetchWeightHistory(userId, supabase);
+        const historyFromDb = await fetchWeightHistory(userId);
         if (!isMounted) return;
-        setWeightHistory(history || defaultWeightHistory);
+
+        setWeightHistory(
+          (historyFromDb || defaultWeightHistory).map((row) => ({
+            date: row.entry_date,
+            weightKg: Number(row.weight_kg),
+            recordedAt: row.recorded_at,
+          })),
+        );
       } catch (err) {
         console.warn('Erro ao carregar histórico de peso', err);
         if (isMounted) {
@@ -138,7 +149,7 @@ function FoodDiary({ userId, supabase, notify }) {
     return () => {
       isMounted = false;
     };
-  }, [userId, supabase]);
+  }, [userId]);
 
   const dayEntries = entriesByDate[selectedDate] || [];
 
@@ -311,47 +322,69 @@ function FoodDiary({ userId, supabase, notify }) {
   };
 
   const handleBodyChange = (field, value) => {
-    setBody((prev) => ({
-      ...prev,
-      [field]: value
-    }));
+    const nextBody = {
+      ...body,
+      [field]: value,
+    };
 
-    // Sempre que mudar o peso, registra no histórico
-    if (field === 'weightKg') {
-      const numeric = value === '' ? null : Number(value);
+    setBody(nextBody);
 
-      if (numeric) {
-        const persistWeight = async () => {
-          try {
-            if (!userId) {
-              setError('Usuário não identificado para salvar o peso.');
-              return;
-            }
-            const saved = await saveWeightEntry(
-              userId,
-              numeric,
-              selectedDate,
-              supabase,
-            );
-            setWeightHistory((prev) => {
-              const withoutToday = prev.filter(
-                (entry) => entry.date !== saved.date,
-              );
-              return [saved, ...withoutToday];
-            });
-            if (typeof notify === 'function') {
-              notify('Peso salvo com sucesso.', 'success');
-            }
-          } catch (err) {
-            console.warn('Erro ao salvar peso', err);
-            setError('Não foi possível salvar o peso.');
-            if (typeof notify === 'function') {
-              notify('Não foi possível salvar o peso.', 'error');
-            }
-          }
-        };
+    if (field === 'weightKg' || field === 'heightCm') {
+      void handleSaveBodyAndWeight(nextBody);
+    }
+  };
 
-        persistWeight();
+  const handleSaveBodyAndWeight = async (nextBody = body) => {
+    try {
+      if (!userId) {
+        setError('Usuário não identificado para salvar o peso.');
+        if (typeof notify === 'function') {
+          notify('Não foi possível salvar o peso.', 'error');
+        }
+        return;
+      }
+
+      const heightCm = nextBody.heightCm ? Number(nextBody.heightCm) : null;
+      const weightKg = nextBody.weightKg ? Number(nextBody.weightKg) : null;
+
+      await saveWeightProfile({
+        userId,
+        calorieGoal: goals.calories,
+        proteinGoal: goals.protein,
+        waterGoalLiters: goals.water,
+        heightCm,
+        weightKg,
+      });
+
+      if (weightKg) {
+        const entryDate = selectedDate;
+        const saved = await saveWeightEntry({
+          userId,
+          entryDate,
+          weightKg,
+        });
+
+        setWeightHistory((prev) => {
+          const filtered = prev.filter((x) => x.date !== saved.entry_date);
+          return [
+            {
+              date: saved.entry_date,
+              weightKg: Number(saved.weight_kg),
+              recordedAt: saved.recorded_at,
+            },
+            ...filtered,
+          ];
+        });
+
+        if (typeof notify === 'function') {
+          notify('Peso salvo com sucesso.', 'success');
+        }
+      }
+    } catch (error) {
+      console.error('Falha ao salvar peso', error);
+      setError('Não foi possível salvar o peso.');
+      if (typeof notify === 'function') {
+        notify('Não foi possível salvar o peso.', 'error');
       }
     }
   };
