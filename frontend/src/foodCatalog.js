@@ -376,5 +376,203 @@ export const FOOD_CATALOG = [
     kcalPorPorcao: 3,
     descricaoPorcao: '1 xícara (200 ml)',
     proteina: 0
+  },
+  {
+    id: 'pao-frances-simples',
+    nome: 'Pão francês',
+    categoria: 'Pães',
+    icon: 'Wheat',
+    kcalPorPorcao: 135,
+    descricaoPorcao: '1 unidade média (50 g)',
+    proteina: 4
+  },
+  {
+    id: 'pao-de-queijo',
+    nome: 'Pão de queijo',
+    categoria: 'Lanches',
+    icon: 'Cheese',
+    kcalPorPorcao: 75,
+    descricaoPorcao: '1 unidade média (20 g)',
+    proteina: 2
+  },
+  {
+    id: 'salgado-assado',
+    nome: 'Salgado assado (ex.: pão de frango, empadão)',
+    categoria: 'Lanches',
+    icon: 'Cookie',
+    kcalPorPorcao: 220,
+    descricaoPorcao: '1 unidade média',
+    proteina: 8
+  },
+  {
+    id: 'salgado-frito',
+    nome: 'Salgado frito (ex.: coxinha, risoles)',
+    categoria: 'Lanches',
+    icon: 'Cookie',
+    kcalPorPorcao: 260,
+    descricaoPorcao: '1 unidade média',
+    proteina: 9
+  },
+  {
+    id: 'pizza-mussarela',
+    nome: 'Pizza de mussarela',
+    categoria: 'Lanches',
+    icon: 'Cookie',
+    kcalPorPorcao: 280,
+    descricaoPorcao: '1 fatia média',
+    proteina: 12
+  },
+  {
+    id: 'hamburguer-simples',
+    nome: 'Hambúrguer simples (pão + carne)',
+    categoria: 'Lanches',
+    icon: 'Cookie',
+    kcalPorPorcao: 350,
+    descricaoPorcao: '1 unidade média',
+    proteina: 16
+  },
+  {
+    id: 'feijao-simples',
+    nome: 'Feijão cozido (simples)',
+    categoria: 'Acompanhamentos',
+    icon: 'Soup',
+    kcalPorPorcao: 95,
+    descricaoPorcao: '1 concha média (100 g)',
+    proteina: 6
+  },
+  {
+    id: 'feijoada',
+    nome: 'Feijoada',
+    categoria: 'Pratos principais',
+    icon: 'Soup',
+    kcalPorPorcao: 320,
+    descricaoPorcao: '1 prato raso (250 g)',
+    proteina: 18
+  },
+  {
+    id: 'strogonoff-frango',
+    nome: 'Strogonoff de frango',
+    categoria: 'Pratos principais',
+    icon: 'Soup',
+    kcalPorPorcao: 280,
+    descricaoPorcao: '1 porção média (200 g)',
+    proteina: 22
+  },
+  {
+    id: 'lasanha-carne',
+    nome: 'Lasanha de carne',
+    categoria: 'Pratos principais',
+    icon: 'Soup',
+    kcalPorPorcao: 320,
+    descricaoPorcao: '1 pedaço médio (200 g)',
+    proteina: 18
+  },
+  {
+    id: 'arroz-carreteiro',
+    nome: 'Arroz carreteiro',
+    categoria: 'Pratos principais',
+    icon: 'Soup',
+    kcalPorPorcao: 280,
+    descricaoPorcao: '1 prato raso (220 g)',
+    proteina: 16
+  },
+  {
+    id: 'salada-simples',
+    nome: 'Salada simples (alface, tomate, cenoura)',
+    categoria: 'Saladas',
+    icon: 'Soup',
+    kcalPorPorcao: 35,
+    descricaoPorcao: '1 prato pequeno',
+    proteina: 1
+  },
+  {
+    id: 'salada-completa',
+    nome: 'Salada completa (folhas + legumes variados)',
+    categoria: 'Saladas',
+    icon: 'Soup',
+    kcalPorPorcao: 70,
+    descricaoPorcao: '1 prato médio',
+    proteina: 3
+  },
+  {
+    id: 'batata-frita',
+    nome: 'Batata frita',
+    categoria: 'Acompanhamentos',
+    icon: 'Soup',
+    kcalPorPorcao: 200,
+    descricaoPorcao: '1 porção pequena (100 g)',
+    proteina: 3
+  },
+  {
+    id: 'bolo-chocolate',
+    nome: 'Bolo de chocolate',
+    categoria: 'Sobremesas',
+    icon: 'Cookie',
+    kcalPorPorcao: 240,
+    descricaoPorcao: '1 fatia média',
+    proteina: 4
+  },
+  {
+    id: 'pudim-leite',
+    nome: 'Pudim de leite',
+    categoria: 'Sobremesas',
+    icon: 'IceCream',
+    kcalPorPorcao: 220,
+    descricaoPorcao: '1 fatia média',
+    proteina: 6
+  },
+  {
+    id: 'brigadeiro',
+    nome: 'Brigadeiro',
+    categoria: 'Sobremesas',
+    icon: 'IceCream',
+    kcalPorPorcao: 90,
+    descricaoPorcao: '1 unidade média',
+    proteina: 1
+  },
+  {
+    id: 'sorvete-creme',
+    nome: 'Sorvete de creme',
+    categoria: 'Sobremesas',
+    icon: 'IceCream',
+    kcalPorPorcao: 110,
+    descricaoPorcao: '1 bola média (60 g)',
+    proteina: 2
+  },
+  {
+    id: 'tapioca-simples',
+    nome: 'Tapioca simples',
+    categoria: 'Lanches',
+    icon: 'Wheat',
+    kcalPorPorcao: 140,
+    descricaoPorcao: '1 unidade média (50 g)',
+    proteina: 1
+  },
+  {
+    id: 'tapioca-com-queijo',
+    nome: 'Tapioca com queijo',
+    categoria: 'Lanches',
+    icon: 'Cheese',
+    kcalPorPorcao: 190,
+    descricaoPorcao: '1 unidade média (60 g)',
+    proteina: 7
+  },
+  {
+    id: 'cachorro-quente',
+    nome: 'Cachorro-quente',
+    categoria: 'Lanches',
+    icon: 'Cookie',
+    kcalPorPorcao: 280,
+    descricaoPorcao: '1 unidade',
+    proteina: 10
+  },
+  {
+    id: 'pastel-frito',
+    nome: 'Pastel frito',
+    categoria: 'Lanches',
+    icon: 'Cookie',
+    kcalPorPorcao: 300,
+    descricaoPorcao: '1 unidade média',
+    proteina: 10
   }
 ];
