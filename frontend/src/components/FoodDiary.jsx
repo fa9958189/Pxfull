@@ -15,6 +15,8 @@ const defaultBody = {
   weightKg: ''
 };
 
+const defaultWeightHistory = [];
+
 const buildUserKey = (userId) => userId || 'default';
 
 const readFromStorage = (userKey) => {
@@ -24,7 +26,8 @@ const readFromStorage = (userKey) => {
       return {
         entriesByDate: {},
         goals: defaultGoals,
-        body: defaultBody
+        body: defaultBody,
+        weightHistory: defaultWeightHistory
       };
     }
     const parsed = JSON.parse(raw);
@@ -32,14 +35,16 @@ const readFromStorage = (userKey) => {
     return {
       entriesByDate: state.entriesByDate || {},
       goals: { ...defaultGoals, ...(state.goals || {}) },
-      body: { ...defaultBody, ...(state.body || {}) }
+      body: { ...defaultBody, ...(state.body || {}) },
+      weightHistory: state.weightHistory || defaultWeightHistory
     };
   } catch (err) {
     console.warn('Erro ao ler diário alimentar', err);
     return {
       entriesByDate: {},
       goals: defaultGoals,
-      body: defaultBody
+      body: defaultBody,
+      weightHistory: defaultWeightHistory
     };
   }
 };
@@ -51,7 +56,8 @@ const writeToStorage = (userKey, state) => {
     parsed[userKey] = {
       entriesByDate: state.entriesByDate,
       goals: state.goals,
-      body: state.body
+      body: state.body,
+      weightHistory: state.weightHistory || []
     };
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
   } catch (err) {
@@ -83,6 +89,9 @@ function FoodDiary({ userId }) {
   const [entriesByDate, setEntriesByDate] = useState(initialState.entriesByDate);
   const [goals, setGoals] = useState(initialState.goals);
   const [body, setBody] = useState(initialState.body);
+  const [weightHistory, setWeightHistory] = useState(
+    initialState.weightHistory || defaultWeightHistory
+  );
   const [selectedDate, setSelectedDate] = useState(
     () => new Date().toISOString().slice(0, 10)
   );
@@ -102,8 +111,8 @@ function FoodDiary({ userId }) {
 
   // Salva no localStorage sempre que algo muda
   useEffect(() => {
-    writeToStorage(userKey, { entriesByDate, goals, body });
-  }, [userKey, entriesByDate, goals, body]);
+    writeToStorage(userKey, { entriesByDate, goals, body, weightHistory });
+  }, [userKey, entriesByDate, goals, body, weightHistory]);
 
   const dayEntries = entriesByDate[selectedDate] || [];
 
@@ -200,6 +209,27 @@ function FoodDiary({ userId }) {
       ...prev,
       [field]: value
     }));
+
+    // sempre que mudar o peso, registra no histórico
+    if (field === 'weightKg') {
+      const numeric = value === '' ? null : Number(value);
+
+      if (numeric) {
+        setWeightHistory((prev) => {
+          // mantém só um registro por dia
+          const filtered = prev.filter((entry) => entry.date !== selectedDate);
+
+          return [
+            ...filtered,
+            {
+              date: selectedDate, // data escolhida no diário
+              weightKg: numeric, // peso do dia
+              recordedAt: new Date().toISOString() // timestamp pra controle
+            }
+          ];
+        });
+      }
+    }
   };
 
   const todayCaloriesText = `Hoje você comeu ${formatNumber(
