@@ -1,9 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import FoodPicker from '../FoodPicker';
-
-const API_BASE_URL =
-  (window.APP_CONFIG && window.APP_CONFIG.apiBaseUrl) ||
-  "http://localhost:3001";
+import {
+  deleteMeal,
+  fetchMealsByDate,
+  saveMeal,
+  updateMeal,
+} from '../foodDiaryApi';
+import { fetchWeightHistory, saveWeightEntry } from '../weightApi';
 
 const defaultGoals = {
   calories: 2000,
@@ -18,46 +21,6 @@ const defaultBody = {
 
 const defaultWeightHistory = [];
 const BLOCKS = 10;
-
-const buildUserKey = (userId) => userId || 'default';
-
-const fetchFoodDiaryState = async (userKey) => {
-  const url = `${API_BASE_URL}/api/food-diary/state?userId=${encodeURIComponent(
-    userKey
-  )}`;
-
-  const res = await fetch(url);
-  if (!res.ok) {
-    throw new Error("Falha ao carregar diário alimentar");
-  }
-
-  const data = await res.json();
-
-  return {
-    entriesByDate: data.entriesByDate || {},
-    goals: { ...defaultGoals, ...(data.goals || {}) },
-    body: { ...defaultBody, ...(data.body || {}) },
-    weightHistory: data.weightHistory || defaultWeightHistory,
-  };
-};
-
-const saveFoodDiaryStateApi = async (userKey, state) => {
-  const url = `${API_BASE_URL}/api/food-diary/state`;
-
-  await fetch(url, {
-    method: "PUT",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      userId: userKey,
-      entriesByDate: state.entriesByDate || {},
-      goals: state.goals || {},
-      body: state.body || {},
-      weightHistory: state.weightHistory || [],
-    }),
-  });
-};
 
 const renderBlocks = (current, goal) => {
   if (!goal || goal <= 0) return '⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜';
@@ -75,13 +38,14 @@ const formatNumber = (value, decimals = 0) => {
   });
 };
 
-function FoodDiary({ userId }) {
-  const userKey = buildUserKey(userId);
+function FoodDiary({ userId, supabase, notify }) {
   const [entriesByDate, setEntriesByDate] = useState({});
   const [goals, setGoals] = useState(defaultGoals);
   const [body, setBody] = useState(defaultBody);
   const [weightHistory, setWeightHistory] = useState(defaultWeightHistory);
-  const [isLoading, setIsLoading] = useState(true);
+  const [, setIsLoading] = useState(true);
+  const [, setSavingEntry] = useState(false);
+  const [, setLoadingWeightHistory] = useState(false);
   const [error, setError] = useState(null);
   const [selectedDate, setSelectedDate] = useState(
     () => new Date().toISOString().slice(0, 10)
@@ -105,21 +69,26 @@ function FoodDiary({ userId }) {
   useEffect(() => {
     let isMounted = true;
 
-    const load = async () => {
+    const loadMeals = async () => {
+      if (!userId) {
+        setIsLoading(false);
+        return;
+      }
+
       try {
         setIsLoading(true);
         setError(null);
-        const data = await fetchFoodDiaryState(userKey);
+        const meals = await fetchMealsByDate(userId, selectedDate, supabase);
         if (!isMounted) return;
 
-        setEntriesByDate(data.entriesByDate || {});
-        setGoals(data.goals || defaultGoals);
-        setBody(data.body || defaultBody);
-        setWeightHistory(data.weightHistory || defaultWeightHistory);
+        setEntriesByDate((prev) => ({
+          ...prev,
+          [selectedDate]: meals || [],
+        }));
       } catch (err) {
-        console.warn('Erro ao carregar diário alimentar', err);
+        console.warn('Erro ao carregar refeições', err);
         if (isMounted) {
-          setError('Não foi possível carregar o diário alimentar.');
+          setError('Não foi possível carregar as refeições do dia.');
         }
       } finally {
         if (isMounted) {
@@ -128,12 +97,12 @@ function FoodDiary({ userId }) {
       }
     };
 
-    load();
+    loadMeals();
 
     return () => {
       isMounted = false;
     };
-  }, [userKey]);
+  }, [userId, selectedDate, supabase]);
 
   useEffect(() => {
     if (error) {
@@ -142,23 +111,34 @@ function FoodDiary({ userId }) {
   }, [error]);
 
   useEffect(() => {
-    if (isLoading) return;
+    let isMounted = true;
 
-    const persist = async () => {
+    const loadWeight = async () => {
+      if (!userId) return;
+
       try {
-        await saveFoodDiaryStateApi(userKey, {
-          entriesByDate,
-          goals,
-          body,
-          weightHistory,
-        });
+        setLoadingWeightHistory(true);
+        const history = await fetchWeightHistory(userId, supabase);
+        if (!isMounted) return;
+        setWeightHistory(history || defaultWeightHistory);
       } catch (err) {
-        console.warn('Erro ao salvar diário alimentar no backend', err);
+        console.warn('Erro ao carregar histórico de peso', err);
+        if (isMounted) {
+          setError('Não foi possível carregar o histórico de peso.');
+        }
+      } finally {
+        if (isMounted) {
+          setLoadingWeightHistory(false);
+        }
       }
     };
 
-    persist();
-  }, [userKey, entriesByDate, goals, body, weightHistory, isLoading]);
+    loadWeight();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [userId, supabase]);
 
   const dayEntries = entriesByDate[selectedDate] || [];
 
@@ -205,21 +185,20 @@ function FoodDiary({ userId }) {
     }));
   };
 
-  const handleAddEntry = (event) => {
+  const handleAddEntry = async (event) => {
     event.preventDefault();
     if (!form.food && !form.calories) {
       return;
     }
 
+    if (!userId) {
+      setError('Usuário não identificado para salvar a refeição.');
+      return;
+    }
+
     const isEditing = Boolean(editingId);
-    const existingEntry = isEditing
-      ? dayEntries.find((e) => e.id === editingId)
-      : null;
 
     const payload = {
-      id: isEditing
-        ? editingId
-        : (crypto.randomUUID ? crypto.randomUUID() : String(Date.now())),
       mealType: form.mealType,
       food: form.food,
       quantity: form.quantity,
@@ -228,39 +207,71 @@ function FoodDiary({ userId }) {
       waterMl: form.waterMl ? Number(form.waterMl) : 0,
       time: form.time,
       notes: form.notes,
-      date: existingEntry?.date || selectedDate,
-      createdAt: existingEntry?.createdAt || new Date().toISOString()
+      date: selectedDate,
     };
 
-    setEntriesByDate((prev) => {
-      const existing = prev[selectedDate] || [];
-      let updated;
+    setSavingEntry(true);
 
+    try {
       if (isEditing) {
-        updated = existing.map((item) =>
-          item.id === editingId ? { ...item, ...payload } : item
+        const updated = await updateMeal(
+          editingId,
+          { ...payload, entry_date: payload.date },
+          supabase,
         );
+        setEntriesByDate((prev) => {
+          const existing = prev[selectedDate] || [];
+          return {
+            ...prev,
+            [selectedDate]: existing.map((item) =>
+              item.id === editingId ? updated : item,
+            ),
+          };
+        });
       } else {
-        updated = [payload, ...existing];
+        const created = await saveMeal(
+          userId,
+          { ...payload, entry_date: payload.date },
+          supabase,
+        );
+        setEntriesByDate((prev) => {
+          const existing = prev[selectedDate] || [];
+          return {
+            ...prev,
+            [selectedDate]: [created, ...existing],
+          };
+        });
       }
 
-      return {
-        ...prev,
-        [selectedDate]: updated
-      };
-    });
-
-    setForm({
-      mealType: 'Almoço',
-      food: '',
-      quantity: '',
-      calories: '',
-      protein: '',
-      waterMl: '',
-      time: '',
-      notes: ''
-    });
-    setEditingId(null);
+      setForm({
+        mealType: 'Almoço',
+        food: '',
+        quantity: '',
+        calories: '',
+        protein: '',
+        waterMl: '',
+        time: '',
+        notes: ''
+      });
+      setEditingId(null);
+      setError(null);
+      if (typeof notify === 'function') {
+        notify(
+          isEditing
+            ? 'Refeição atualizada com sucesso.'
+            : 'Refeição adicionada com sucesso.',
+          'success'
+        );
+      }
+    } catch (err) {
+      console.warn('Erro ao salvar refeição no Supabase', err);
+      setError('Não foi possível salvar a refeição.');
+      if (typeof notify === 'function') {
+        notify('Não foi possível salvar a refeição.', 'error');
+      }
+    } finally {
+      setSavingEntry(false);
+    }
   };
 
   const handleEditEntry = (entry) => {
@@ -277,15 +288,27 @@ function FoodDiary({ userId }) {
     });
   };
 
-  const handleDeleteEntry = (entryId) => {
-    setEntriesByDate((prev) => {
-      const existing = prev[selectedDate] || [];
-      const updated = existing.filter((item) => item.id !== entryId);
-      return {
-        ...prev,
-        [selectedDate]: updated
-      };
-    });
+  const handleDeleteEntry = async (entryId) => {
+    try {
+      await deleteMeal(entryId, supabase);
+      setEntriesByDate((prev) => {
+        const existing = prev[selectedDate] || [];
+        const updated = existing.filter((item) => item.id !== entryId);
+        return {
+          ...prev,
+          [selectedDate]: updated
+        };
+      });
+      if (typeof notify === 'function') {
+        notify('Refeição excluída.', 'success');
+      }
+    } catch (err) {
+      console.warn('Erro ao excluir refeição', err);
+      setError('Não foi possível excluir a refeição.');
+      if (typeof notify === 'function') {
+        notify('Não foi possível excluir a refeição.', 'error');
+      }
+    }
   };
 
   const handleGoalChange = (field, value) => {
@@ -306,18 +329,37 @@ function FoodDiary({ userId }) {
       const numeric = value === '' ? null : Number(value);
 
       if (numeric) {
-        setWeightHistory((prev) => {
-          // remove registro antigo desse mesmo dia
-          const withoutToday = prev.filter((entry) => entry.date !== selectedDate);
+        const persistWeight = async () => {
+          try {
+            if (!userId) {
+              setError('Usuário não identificado para salvar o peso.');
+              return;
+            }
+            const saved = await saveWeightEntry(
+              userId,
+              numeric,
+              selectedDate,
+              supabase,
+            );
+            setWeightHistory((prev) => {
+              const withoutToday = prev.filter(
+                (entry) => entry.date !== saved.date,
+              );
+              return [saved, ...withoutToday];
+            });
+            if (typeof notify === 'function') {
+              notify('Peso salvo com sucesso.', 'success');
+            }
+          } catch (err) {
+            console.warn('Erro ao salvar peso', err);
+            setError('Não foi possível salvar o peso.');
+            if (typeof notify === 'function') {
+              notify('Não foi possível salvar o peso.', 'error');
+            }
+          }
+        };
 
-          const newEntry = {
-            date: selectedDate,
-            weightKg: numeric,
-            recordedAt: new Date().toISOString()
-          };
-
-          return [...withoutToday, newEntry];
-        });
+        persistWeight();
       }
     }
   };
