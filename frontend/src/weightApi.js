@@ -1,70 +1,73 @@
-const getSupabaseClient = (supabaseClient) => {
-  if (supabaseClient) return supabaseClient;
+import { supabase } from './supabaseClient';
 
-  const { supabaseUrl, supabaseAnonKey, authSchema } = window.APP_CONFIG || {};
-  if (!window.supabase || !supabaseUrl || !supabaseAnonKey) {
-    throw new Error('Supabase não configurado corretamente.');
-  }
-
-  if (!getSupabaseClient.cached) {
-    getSupabaseClient.cached = window.supabase.createClient(
-      supabaseUrl,
-      supabaseAnonKey,
-      {
-        auth: {
-          detectSessionInUrl: true,
-          persistSession: true,
-          storageKey: 'gp-react-session',
-          schema: authSchema || 'public',
-        },
-      },
-    );
-  }
-
-  return getSupabaseClient.cached;
-};
-
-const normalizeWeightEntry = (item) => ({
-  id: item.id,
-  date: item.entry_date,
-  weightKg: Number(
-    item.weight_value ?? item.weight ?? item.weightkg ?? item.weight_kg ?? 0,
-  ),
-  recordedAt: item.created_at,
-});
-
-export const saveWeightEntry = async (
+// Salva/atualiza o perfil de metas + altura/peso atual
+export async function saveWeightProfile({
   userId,
-  weightValue,
-  entryDate,
-  supabaseClient,
-) => {
-  const supabase = getSupabaseClient(supabaseClient);
-  const payload = {
-    user_id: userId,
-    weight_value: weightValue,
-    entry_date: entryDate,
-  };
-
+  calorieGoal,
+  proteinGoal,
+  waterGoalLiters,
+  heightCm,
+  weightKg,
+}) {
   const { data, error } = await supabase
-    .from('food_weight_history')
-    .insert(payload)
+    .from('food_diary_profile')
+    .upsert(
+      {
+        user_id: userId,
+        calorie_goal: calorieGoal,
+        protein_goal: proteinGoal,
+        water_goal_l: waterGoalLiters,
+        height_cm: heightCm || null,
+        weight_kg: weightKg || null,
+      },
+      { onConflict: 'user_id' },
+    )
     .select()
     .single();
 
-  if (error) throw error;
-  return normalizeWeightEntry(data);
-};
+  if (error) {
+    console.error('Erro ao salvar perfil de peso no Supabase', error);
+    throw error;
+  }
 
-export const fetchWeightHistory = async (userId, supabaseClient) => {
-  const supabase = getSupabaseClient(supabaseClient);
+  return data;
+}
+
+// Registra uma entrada no histórico de peso
+export async function saveWeightEntry({ userId, entryDate, weightKg }) {
+  const { data, error } = await supabase
+    .from('food_weight_history')
+    .insert([
+      {
+        user_id: userId, // OBRIGATÓRIO, NOT NULL
+        entry_date: entryDate, // string 'YYYY-MM-DD'
+        weight_kg: weightKg, // número
+      },
+    ])
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Erro ao salvar histórico de peso no Supabase', error);
+    throw error;
+  }
+
+  return data;
+}
+
+// Busca o histórico de peso do usuário (para mostrar na tela)
+export async function fetchWeightHistory(userId) {
   const { data, error } = await supabase
     .from('food_weight_history')
     .select('*')
     .eq('user_id', userId)
     .order('entry_date', { ascending: false })
-    .limit(10);
+    .limit(30);
 
-  if (error) throw error;
-  return (data || []).map(normalizeWeightEntry);
-};
+  if (error) {
+    console.error('Erro ao buscar histórico de peso no Supabase', error);
+    throw error;
+  }
+
+  return data || [];
+}
