@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import FoodPicker from '../FoodPicker';
 
-const STORAGE_KEY = 'gp-workout-food-diary';
-const BLOCKS = 10;
+const API_BASE_URL =
+  (window.APP_CONFIG && window.APP_CONFIG.apiBaseUrl) ||
+  "http://localhost:3001";
 
 const defaultGoals = {
   calories: 2000,
@@ -16,53 +17,46 @@ const defaultBody = {
 };
 
 const defaultWeightHistory = [];
+const BLOCKS = 10;
 
 const buildUserKey = (userId) => userId || 'default';
 
-const readFromStorage = (userKey) => {
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) {
-      return {
-        entriesByDate: {},
-        goals: defaultGoals,
-        body: defaultBody,
-        weightHistory: defaultWeightHistory
-      };
-    }
-    const parsed = JSON.parse(raw);
-    const state = parsed[userKey] || {};
-    return {
-      entriesByDate: state.entriesByDate || {},
-      goals: { ...defaultGoals, ...(state.goals || {}) },
-      body: { ...defaultBody, ...(state.body || {}) },
-      weightHistory: state.weightHistory || defaultWeightHistory
-    };
-  } catch (err) {
-    console.warn('Erro ao ler diário alimentar', err);
-    return {
-      entriesByDate: {},
-      goals: defaultGoals,
-      body: defaultBody,
-      weightHistory: defaultWeightHistory
-    };
+const fetchFoodDiaryState = async (userKey) => {
+  const url = `${API_BASE_URL}/api/food-diary/state?userId=${encodeURIComponent(
+    userKey
+  )}`;
+
+  const res = await fetch(url);
+  if (!res.ok) {
+    throw new Error("Falha ao carregar diário alimentar");
   }
+
+  const data = await res.json();
+
+  return {
+    entriesByDate: data.entriesByDate || {},
+    goals: { ...defaultGoals, ...(data.goals || {}) },
+    body: { ...defaultBody, ...(data.body || {}) },
+    weightHistory: data.weightHistory || defaultWeightHistory,
+  };
 };
 
-const writeToStorage = (userKey, state) => {
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    const parsed = raw ? JSON.parse(raw) : {};
-    parsed[userKey] = {
-      entriesByDate: state.entriesByDate,
-      goals: state.goals,
-      body: state.body,
-      weightHistory: state.weightHistory || defaultWeightHistory
-    };
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
-  } catch (err) {
-    console.warn('Erro ao salvar diário alimentar', err);
-  }
+const saveFoodDiaryStateApi = async (userKey, state) => {
+  const url = `${API_BASE_URL}/api/food-diary/state`;
+
+  await fetch(url, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      userId: userKey,
+      entriesByDate: state.entriesByDate || {},
+      goals: state.goals || {},
+      body: state.body || {},
+      weightHistory: state.weightHistory || [],
+    }),
+  });
 };
 
 const renderBlocks = (current, goal) => {
@@ -83,15 +77,12 @@ const formatNumber = (value, decimals = 0) => {
 
 function FoodDiary({ userId }) {
   const userKey = buildUserKey(userId);
-
-  const initialState = useMemo(() => readFromStorage(userKey), [userKey]);
-
-  const [entriesByDate, setEntriesByDate] = useState(initialState.entriesByDate);
-  const [goals, setGoals] = useState(initialState.goals);
-  const [body, setBody] = useState(initialState.body);
-  const [weightHistory, setWeightHistory] = useState(
-    initialState.weightHistory || defaultWeightHistory
-  );
+  const [entriesByDate, setEntriesByDate] = useState({});
+  const [goals, setGoals] = useState(defaultGoals);
+  const [body, setBody] = useState(defaultBody);
+  const [weightHistory, setWeightHistory] = useState(defaultWeightHistory);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [selectedDate, setSelectedDate] = useState(
     () => new Date().toISOString().slice(0, 10)
   );
@@ -111,10 +102,63 @@ function FoodDiary({ userId }) {
 
   const [isFoodPickerOpen, setIsFoodPickerOpen] = useState(false);
 
-  // Salva no localStorage sempre que algo muda
   useEffect(() => {
-    writeToStorage(userKey, { entriesByDate, goals, body, weightHistory });
-  }, [userKey, entriesByDate, goals, body, weightHistory]);
+    let isMounted = true;
+
+    const load = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+        const data = await fetchFoodDiaryState(userKey);
+        if (!isMounted) return;
+
+        setEntriesByDate(data.entriesByDate || {});
+        setGoals(data.goals || defaultGoals);
+        setBody(data.body || defaultBody);
+        setWeightHistory(data.weightHistory || defaultWeightHistory);
+      } catch (err) {
+        console.warn('Erro ao carregar diário alimentar', err);
+        if (isMounted) {
+          setError('Não foi possível carregar o diário alimentar.');
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    load();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [userKey]);
+
+  useEffect(() => {
+    if (error) {
+      console.warn(error);
+    }
+  }, [error]);
+
+  useEffect(() => {
+    if (isLoading) return;
+
+    const persist = async () => {
+      try {
+        await saveFoodDiaryStateApi(userKey, {
+          entriesByDate,
+          goals,
+          body,
+          weightHistory,
+        });
+      } catch (err) {
+        console.warn('Erro ao salvar diário alimentar no backend', err);
+      }
+    };
+
+    persist();
+  }, [userKey, entriesByDate, goals, body, weightHistory, isLoading]);
 
   const dayEntries = entriesByDate[selectedDate] || [];
 
