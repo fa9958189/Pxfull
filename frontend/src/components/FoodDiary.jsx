@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import FoodPicker from '../FoodPicker';
 
 const STORAGE_KEY = 'gp-workout-food-diary';
 const BLOCKS = 10;
@@ -97,6 +98,8 @@ function FoodDiary({ userId }) {
     notes: ''
   });
 
+  const [isFoodPickerOpen, setIsFoodPickerOpen] = useState(false);
+
   // Salva no localStorage sempre que algo muda
   useEffect(() => {
     writeToStorage(userKey, { entriesByDate, goals, body });
@@ -135,6 +138,16 @@ function FoodDiary({ userId }) {
 
   const handleChangeForm = (field, value) => {
     setForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleSelectFood = (foodData) => {
+    setForm((prev) => ({
+      ...prev,
+      food: foodData.nome,
+      quantity: foodData.quantidadeTexto,
+      calories: foodData.kcal,
+      protein: foodData.proteina
+    }));
   };
 
   const handleAddEntry = (event) => {
@@ -244,12 +257,22 @@ function FoodDiary({ userId }) {
 
             <div className="field">
               <label>Alimento</label>
-              <input
-                type="text"
-                placeholder="Ex.: Arroz, frango grelhado, iogurte..."
-                value={form.food}
-                onChange={(e) => handleChangeForm('food', e.target.value)}
-              />
+              <div className="row" style={{ gap: 8 }}>
+                <input
+                  type="text"
+                  placeholder="Ex.: Arroz, frango grelhado, iogurte..."
+                  value={form.food}
+                  onChange={(e) => handleChangeForm('food', e.target.value)}
+                  style={{ flex: 1 }}
+                />
+                <button
+                  type="button"
+                  className="ghost small"
+                  onClick={() => setIsFoodPickerOpen(true)}
+                >
+                  Buscar alimento
+                </button>
+              </div>
             </div>
 
             <div className="row" style={{ gap: 8 }}>
@@ -503,6 +526,13 @@ function FoodDiary({ userId }) {
           </div>
         </aside>
       </div>
+      {isFoodPickerOpen && (
+        <FoodPicker
+          open={isFoodPickerOpen}
+          onClose={() => setIsFoodPickerOpen(false)}
+          onSelectFood={handleSelectFood}
+        />
+      )}
     </div>
   );
 }
