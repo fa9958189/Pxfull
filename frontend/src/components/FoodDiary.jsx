@@ -207,18 +207,14 @@ function FoodDiary({ userId, supabase, notify }) {
       waterMl: form.waterMl ? Number(form.waterMl) : 0,
       time: form.time,
       notes: form.notes,
-      date: selectedDate,
+      entryDate: selectedDate,
     };
 
     setSavingEntry(true);
 
     try {
       if (isEditing) {
-        const updated = await updateMeal(
-          editingId,
-          { ...payload, entry_date: payload.date },
-          supabase,
-        );
+        const updated = await updateMeal(editingId, payload, supabase);
         setEntriesByDate((prev) => {
           const existing = prev[selectedDate] || [];
           return {
@@ -229,11 +225,7 @@ function FoodDiary({ userId, supabase, notify }) {
           };
         });
       } else {
-        const created = await saveMeal(
-          userId,
-          { ...payload, entry_date: payload.date },
-          supabase,
-        );
+        const created = await saveMeal({ userId, ...payload }, supabase);
         setEntriesByDate((prev) => {
           const existing = prev[selectedDate] || [];
           return {
@@ -264,7 +256,7 @@ function FoodDiary({ userId, supabase, notify }) {
         );
       }
     } catch (err) {
-      console.warn('Erro ao salvar refeição no Supabase', err);
+      console.error('Falha ao salvar refeição', err);
       setError('Não foi possível salvar a refeição.');
       if (typeof notify === 'function') {
         notify('Não foi possível salvar a refeição.', 'error');

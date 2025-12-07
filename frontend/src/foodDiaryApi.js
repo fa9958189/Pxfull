@@ -26,36 +26,50 @@ const getSupabaseClient = (supabaseClient) => {
 
 const normalizeMealFromDb = (item) => ({
   id: item.id,
-  mealType: item.refeicao || '',
-  food: item.alimento || '',
-  quantity: item.quantidade || '',
-  calories: item.calorias != null ? Number(item.calorias) : 0,
-  protein: item.proteina != null ? Number(item.proteina) : 0,
-  waterMl: item.agua != null ? Number(item.agua) : 0,
-  time: item.horario || '',
-  notes: item.observacoes || '',
+  mealType: item.meal_type || '',
+  food: item.food || '',
+  quantity: item.quantity || '',
+  calories: item.calories != null ? Number(item.calories) : 0,
+  protein: item.protein != null ? Number(item.protein) : 0,
+  waterMl: item.water_ml != null ? Number(item.water_ml) : 0,
+  time: item.entry_time || '',
+  notes: item.notes || '',
   date: item.entry_date,
   createdAt: item.created_at,
 });
 
-export const saveMeal = async (userId, mealData, supabaseClient) => {
+export const saveMeal = async (
+  {
+    userId,
+    entryDate,
+    mealType,
+    food,
+    quantity,
+    calories,
+    protein,
+    waterMl,
+    time,
+    notes,
+  },
+  supabaseClient,
+) => {
   const supabase = getSupabaseClient(supabaseClient);
   const payload = {
     user_id: userId,
-    entry_date: mealData.entry_date || mealData.date,
-    refeicao: mealData.mealType || mealData.refeicao || '',
-    alimento: mealData.food || mealData.alimento || '',
-    quantidade: mealData.quantity ?? mealData.quantidade ?? '',
-    calorias: mealData.calories ?? mealData.calorias ?? null,
-    proteina: mealData.protein ?? mealData.proteina ?? null,
-    agua: mealData.waterMl ?? mealData.agua ?? null,
-    horario: mealData.time ?? mealData.horario ?? null,
-    observacoes: mealData.notes ?? mealData.observacoes ?? null,
+    entry_date: entryDate,
+    entry_time: time || null,
+    meal_type: mealType,
+    food,
+    quantity,
+    calories: calories || 0,
+    protein: protein || 0,
+    water_ml: waterMl || 0,
+    notes: notes || null,
   };
 
   const { data, error } = await supabase
     .from('food_diary_entries')
-    .insert(payload)
+    .insert([payload])
     .select()
     .single();
 
@@ -79,15 +93,15 @@ export const fetchMealsByDate = async (userId, date, supabaseClient) => {
 export const updateMeal = async (entryId, newData, supabaseClient) => {
   const supabase = getSupabaseClient(supabaseClient);
   const payload = {
-    refeicao: newData.mealType ?? newData.refeicao ?? '',
-    alimento: newData.food ?? newData.alimento ?? '',
-    quantidade: newData.quantity ?? newData.quantidade ?? '',
-    calorias: newData.calories ?? newData.calorias ?? null,
-    proteina: newData.protein ?? newData.proteina ?? null,
-    agua: newData.waterMl ?? newData.agua ?? null,
-    horario: newData.time ?? newData.horario ?? null,
-    observacoes: newData.notes ?? newData.observacoes ?? null,
-    entry_date: newData.entry_date || newData.date,
+    meal_type: newData.mealType ?? newData.meal_type ?? '',
+    food: newData.food ?? newData.alimento ?? '',
+    quantity: newData.quantity ?? newData.quantidade ?? '',
+    calories: newData.calories ?? newData.calorias ?? null,
+    protein: newData.protein ?? newData.proteina ?? null,
+    water_ml: newData.waterMl ?? newData.agua ?? null,
+    entry_time: newData.time ?? newData.entry_time ?? null,
+    notes: newData.notes ?? newData.observacoes ?? null,
+    entry_date: newData.entryDate || newData.entry_date || newData.date,
   };
 
   const { data, error } = await supabase
