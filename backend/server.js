@@ -13,6 +13,10 @@ import {
   summarizeProgress,
   upsertWorkoutTemplate,
 } from "./workoutsStorage.js";
+import {
+  getFoodDiaryState,
+  saveFoodDiaryState,
+} from "./foodDiaryStorage.js";
 
 const app = express();
 app.use(cors());
@@ -647,6 +651,59 @@ CREATE TABLE IF NOT EXISTS public.workout_schedule (
   created_at timestamptz DEFAULT now()
 );
 */
+
+app.get("/api/food-diary/state", async (req, res) => {
+  try {
+    const userId = getUserIdFromRequest(req);
+
+    if (!userId) {
+      return res
+        .status(400)
+        .json({ error: "userId é obrigatório para carregar o diário alimentar" });
+    }
+
+    const state = await getFoodDiaryState(userId);
+    return res.json(state);
+  } catch (err) {
+    console.error("Erro ao buscar diário alimentar", err);
+    return res
+      .status(500)
+      .json({ error: "Erro interno ao buscar diário alimentar" });
+  }
+});
+
+app.put("/api/food-diary/state", async (req, res) => {
+  try {
+    const userId = getUserIdFromRequest(req) || req.body?.userId;
+
+    if (!userId) {
+      return res
+        .status(400)
+        .json({ error: "userId é obrigatório para salvar o diário alimentar" });
+    }
+
+    const {
+      entriesByDate = {},
+      goals = {},
+      body = {},
+      weightHistory = [],
+    } = req.body || {};
+
+    const saved = await saveFoodDiaryState(userId, {
+      entriesByDate,
+      goals,
+      body,
+      weightHistory,
+    });
+
+    return res.json(saved);
+  } catch (err) {
+    console.error("Erro ao salvar diário alimentar", err);
+    return res
+      .status(500)
+      .json({ error: "Erro interno ao salvar diário alimentar" });
+  }
+});
 
 app.listen(3001, () => {
   console.log("Backend rodando na porta 3001");
