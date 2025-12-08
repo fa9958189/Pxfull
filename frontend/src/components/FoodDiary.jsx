@@ -71,6 +71,7 @@ function FoodDiary({ userId, supabase, notify }) {
 
   const [isFoodPickerOpen, setIsFoodPickerOpen] = useState(false);
   const [isScanningFood, setIsScanningFood] = useState(false);
+  const [scanPreview, setScanPreview] = useState([]);
   const fileInputRef = useRef(null);
 
   useEffect(() => {
@@ -203,23 +204,7 @@ function FoodDiary({ userId, supabase, notify }) {
     setIsScanningFood(true);
     try {
       const analysis = await scanFood(file);
-      setForm((prev) => ({
-        ...prev,
-        food: analysis?.alimento ?? prev.food,
-        quantity: analysis?.quantidade ?? prev.quantity,
-        calories:
-          analysis?.calorias !== undefined && analysis?.calorias !== null
-            ? String(analysis.calorias)
-            : prev.calories,
-        protein:
-          analysis?.proteina !== undefined && analysis?.proteina !== null
-            ? String(analysis.proteina)
-            : prev.protein,
-        waterMl:
-          analysis?.agua !== undefined && analysis?.agua !== null
-            ? String(analysis.agua)
-            : prev.waterMl,
-      }));
+      setScanPreview(Array.isArray(analysis?.itens) ? analysis.itens : []);
       setError(null);
       if (typeof notify === 'function') {
         notify('Alimento escaneado com sucesso.', 'success');
@@ -227,12 +212,55 @@ function FoodDiary({ userId, supabase, notify }) {
     } catch (err) {
       console.error('Erro ao escanear alimento', err);
       setError('Não foi possível analisar a imagem do alimento.');
+      setScanPreview([]);
       if (typeof notify === 'function') {
         notify('Não foi possível analisar a imagem do alimento.', 'error');
       }
     } finally {
       setIsScanningFood(false);
     }
+  };
+
+  const handleApplyScannedItem = (item) => {
+    if (!item) return;
+    setForm((prev) => ({
+      ...prev,
+      food: item.nome ?? prev.food,
+      quantity: item.quantidade ?? prev.quantity,
+      calories:
+        item.calorias !== undefined && item.calorias !== null
+          ? String(item.calorias)
+          : prev.calories,
+      protein:
+        item.proteina !== undefined && item.proteina !== null
+          ? String(item.proteina)
+          : prev.protein,
+      waterMl:
+        item.agua !== undefined && item.agua !== null
+          ? String(item.agua)
+          : prev.waterMl,
+    }));
+  };
+
+  const handleApplyAllScannedItems = () => {
+    if (!scanPreview || scanPreview.length === 0) return;
+
+    const totalsFromPreview = scanPreview.reduce(
+      (acc, current) => ({
+        calorias: acc.calorias + (Number(current.calorias) || 0),
+        proteina: acc.proteina + (Number(current.proteina) || 0),
+        agua: acc.agua + (Number(current.agua) || 0),
+      }),
+      { calorias: 0, proteina: 0, agua: 0 },
+    );
+
+    setForm((prev) => ({
+      ...prev,
+      food: prev.food || 'Itens escaneados',
+      calories: String(totalsFromPreview.calorias),
+      protein: String(totalsFromPreview.proteina),
+      waterMl: String(totalsFromPreview.agua),
+    }));
   };
 
   const handleSelectImageForScan = () => {
@@ -529,6 +557,66 @@ function FoodDiary({ userId, supabase, notify }) {
                 />
               </div>
             </div>
+
+            {scanPreview && scanPreview.length > 0 && (
+              <div className="field">
+                <label>Itens identificados</label>
+                <div className="muted" style={{ fontSize: 13, marginBottom: 6 }}>
+                  Confira os alimentos detectados e escolha uma opção.
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {scanPreview.map((item, index) => (
+                    <div
+                      key={`${item.nome || 'item'}-${index}`}
+                      style={{
+                        padding: 8,
+                        border: '1px solid #eee',
+                        borderRadius: 6,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 6,
+                      }}
+                    >
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                        <strong>{item.nome}</strong>
+                        {item.quantidade && (
+                          <span className="muted">• {item.quantidade}</span>
+                        )}
+                        <span className="muted">• {formatNumber(item.calorias || 0, 0)} kcal</span>
+                        <span className="muted">• {formatNumber(item.proteina || 0, 0)} g proteína</span>
+                        <span className="muted">• {formatNumber((item.agua || 0) / 1000, 2)} L água</span>
+                      </div>
+                      <div className="row" style={{ gap: 8, justifyContent: 'flex-end' }}>
+                        <button
+                          type="button"
+                          className="ghost small"
+                          onClick={() => handleApplyScannedItem(item)}
+                        >
+                          Usar este alimento
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="row" style={{ gap: 8, marginTop: 8, justifyContent: 'flex-end' }}>
+                  <button
+                    type="button"
+                    className="ghost small"
+                    onClick={handleApplyAllScannedItems}
+                  >
+                    Somar tudo e preencher a refeição
+                  </button>
+                  <button
+                    type="button"
+                    className="ghost small"
+                    onClick={() => setScanPreview([])}
+                  >
+                    Limpar
+                  </button>
+                </div>
+              </div>
+            )}
 
             <div className="row" style={{ gap: 8 }}>
               <div className="field" style={{ flex: 1 }}>
