@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import FoodPicker from '../FoodPicker';
 import {
   deleteMeal,
@@ -11,6 +11,7 @@ import {
   saveWeightEntry,
   saveWeightProfile,
 } from '../weightApi';
+import { scanFood } from '../services/foodScannerApi';
 
 const defaultGoals = {
   calories: 2000,
@@ -69,6 +70,8 @@ function FoodDiary({ userId, supabase, notify }) {
   const [editingId, setEditingId] = useState(null);
 
   const [isFoodPickerOpen, setIsFoodPickerOpen] = useState(false);
+  const [isScanningFood, setIsScanningFood] = useState(false);
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -194,6 +197,54 @@ function FoodDiary({ userId, supabase, notify }) {
       calories: foodData.kcal,
       protein: foodData.proteina
     }));
+  };
+
+  const handleScanFood = async (file) => {
+    setIsScanningFood(true);
+    try {
+      const analysis = await scanFood(file);
+      setForm((prev) => ({
+        ...prev,
+        food: analysis?.alimento ?? prev.food,
+        quantity: analysis?.quantidade ?? prev.quantity,
+        calories:
+          analysis?.calorias !== undefined && analysis?.calorias !== null
+            ? String(analysis.calorias)
+            : prev.calories,
+        protein:
+          analysis?.proteina !== undefined && analysis?.proteina !== null
+            ? String(analysis.proteina)
+            : prev.protein,
+        waterMl:
+          analysis?.agua !== undefined && analysis?.agua !== null
+            ? String(analysis.agua)
+            : prev.waterMl,
+      }));
+      setError(null);
+      if (typeof notify === 'function') {
+        notify('Alimento escaneado com sucesso.', 'success');
+      }
+    } catch (err) {
+      console.error('Erro ao escanear alimento', err);
+      setError('Não foi possível analisar a imagem do alimento.');
+      if (typeof notify === 'function') {
+        notify('Não foi possível analisar a imagem do alimento.', 'error');
+      }
+    } finally {
+      setIsScanningFood(false);
+    }
+  };
+
+  const handleSelectImageForScan = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleImageInputChange = (event) => {
+    const [file] = event.target.files || [];
+    if (file) {
+      void handleScanFood(file);
+    }
+    event.target.value = '';
   };
 
   const handleAddEntry = async (event) => {
@@ -455,10 +506,26 @@ function FoodDiary({ userId, supabase, notify }) {
                 <button
                   type="button"
                   className="ghost small"
+                  onClick={handleSelectImageForScan}
+                  disabled={isScanningFood}
+                >
+                  📷 Escanear comida
+                </button>
+                <button
+                  type="button"
+                  className="ghost small"
                   onClick={() => setIsFoodPickerOpen(true)}
+                  disabled={isScanningFood}
                 >
                   Buscar alimento
                 </button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  style={{ display: 'none' }}
+                  onChange={handleImageInputChange}
+                />
               </div>
             </div>
 
