@@ -1,4 +1,5 @@
 import "dotenv/config";
+import fetch from "node-fetch";
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
@@ -28,7 +29,7 @@ export async function analyzeFoodImage(buffer) {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${OPENAI_API_KEY}`,
+      "Authorization": `Bearer ${OPENAI_API_KEY}`
     },
     body: JSON.stringify({
       model: "gpt-4o-mini",
