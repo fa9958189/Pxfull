@@ -2,10 +2,23 @@ import "dotenv/config";
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
-const ANALYSIS_PROMPT = `Analise a imagem e identifique o alimento principal.
-Retorne APENAS um JSON com os campos: alimento, quantidade, calorias, proteina, agua.
-Não escreva texto fora do JSON.
-Complete valores aproximados de calorias e proteína se possível.`;
+const ANALYSIS_PROMPT = `Analise a imagem e identifique TODOS os alimentos visíveis.
+Retorne APENAS um JSON no formato:
+
+{
+  "itens": [
+    {
+      "nome": "carne de porco",
+      "quantidade": "150 g",
+      "calorias": 320,
+      "proteina": 30,
+      "agua": 50
+    }
+  ]
+}
+
+Para cada item, estime quantidade, calorias, proteína e água.
+Não escreva nada fora do JSON.`;
 
 const mapValueOrDefault = (value, fallback) => {
   const numeric = Number(value);
@@ -70,10 +83,14 @@ export async function analyzeFoodImage(buffer) {
   }
 
   return {
-    alimento: parsed?.alimento || "",
-    quantidade: parsed?.quantidade || "",
-    calorias: mapValueOrDefault(parsed?.calorias, 0),
-    proteina: mapValueOrDefault(parsed?.proteina, 0),
-    agua: mapValueOrDefault(parsed?.agua, 0),
+    itens: Array.isArray(parsed?.itens)
+      ? parsed.itens.map((item) => ({
+          nome: item?.nome || "",
+          quantidade: item?.quantidade || "",
+          calorias: mapValueOrDefault(item?.calorias, 0),
+          proteina: mapValueOrDefault(item?.proteina, 0),
+          agua: mapValueOrDefault(item?.agua, 0),
+        }))
+      : [],
   };
 }
