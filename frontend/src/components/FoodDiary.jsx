@@ -523,7 +523,8 @@ function FoodDiary({ userId, supabase, notify }) {
                   ref={fileInputRef}
                   type="file"
                   accept="image/*"
-                  style={{ display: 'none' }}
+                  capture="environment"
+                  style={{ position: 'absolute', opacity: 0, width: 0, height: 0, pointerEvents: 'none' }}
                   onChange={handleImageInputChange}
                 />
               </div>
