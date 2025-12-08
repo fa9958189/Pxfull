@@ -191,13 +191,20 @@ function FoodDiary({ userId, supabase, notify }) {
   };
 
   const handleSelectFood = (foodData) => {
-    setForm((prev) => ({
-      ...prev,
-      food: foodData.nome,
-      quantity: foodData.quantidadeTexto,
-      calories: foodData.kcal,
-      protein: foodData.proteina
-    }));
+    const selectedItem = {
+      nome: foodData.nome,
+      quantidade: foodData.quantidadeTexto,
+      calorias: Number(foodData.kcal) || 0,
+      proteina: Number(foodData.proteina) || 0,
+      agua: 0,
+    };
+
+    setScanPreview((prev) => {
+      if (Array.isArray(prev)) {
+        return [...prev, selectedItem];
+      }
+      return [selectedItem];
+    });
   };
 
   const handleScanFood = async (file) => {
