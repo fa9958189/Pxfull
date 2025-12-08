@@ -15,5 +15,6 @@ export async function scanFood(imageFile) {
     throw new Error('Falha ao escanear alimento.');
   }
 
-  return response.json();
+  const data = await response.json();
+  return data;
 }

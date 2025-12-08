@@ -71,7 +71,7 @@ function FoodDiary({ userId, supabase, notify }) {
 
   const [isFoodPickerOpen, setIsFoodPickerOpen] = useState(false);
   const [isScanningFood, setIsScanningFood] = useState(false);
-  const [scanPreview, setScanPreview] = useState([]);
+  const [scanPreview, setScanPreview] = useState(null);
   const fileInputRef = useRef(null);
 
   useEffect(() => {
@@ -225,41 +225,44 @@ function FoodDiary({ userId, supabase, notify }) {
     if (!item) return;
     setForm((prev) => ({
       ...prev,
-      food: item.nome ?? prev.food,
-      quantity: item.quantidade ?? prev.quantity,
+      food: item.nome || prev.food,
+      quantity: item.quantidade || prev.quantity,
       calories:
-        item.calorias !== undefined && item.calorias !== null
+        item.calorias != null
           ? String(item.calorias)
           : prev.calories,
       protein:
-        item.proteina !== undefined && item.proteina !== null
+        item.proteina != null
           ? String(item.proteina)
           : prev.protein,
       waterMl:
-        item.agua !== undefined && item.agua !== null
+        item.agua != null
           ? String(item.agua)
           : prev.waterMl,
     }));
   };
 
   const handleApplyAllScannedItems = () => {
-    if (!scanPreview || scanPreview.length === 0) return;
+    if (!Array.isArray(scanPreview) || scanPreview.length === 0) return;
 
-    const totalsFromPreview = scanPreview.reduce(
-      (acc, current) => ({
-        calorias: acc.calorias + (Number(current.calorias) || 0),
-        proteina: acc.proteina + (Number(current.proteina) || 0),
-        agua: acc.agua + (Number(current.agua) || 0),
+    const total = scanPreview.reduce(
+      (acc, item) => ({
+        calorias: acc.calorias + (Number(item.calorias) || 0),
+        proteina: acc.proteina + (Number(item.proteina) || 0),
+        agua: acc.agua + (Number(item.agua) || 0),
       }),
-      { calorias: 0, proteina: 0, agua: 0 },
+      { calorias: 0, proteina: 0, agua: 0 }
     );
 
     setForm((prev) => ({
       ...prev,
-      food: prev.food || 'Itens escaneados',
-      calories: String(totalsFromPreview.calorias),
-      protein: String(totalsFromPreview.proteina),
-      waterMl: String(totalsFromPreview.agua),
+      food: scanPreview
+        .map((i) => i.nome)
+        .filter(Boolean)
+        .join(', ') || prev.food,
+      calories: String(total.calorias),
+      protein: String(total.proteina),
+      waterMl: String(total.agua),
     }));
   };
 
@@ -558,63 +561,51 @@ function FoodDiary({ userId, supabase, notify }) {
               </div>
             </div>
 
-            {scanPreview && scanPreview.length > 0 && (
-              <div className="field">
-                <label>Itens identificados</label>
-                <div className="muted" style={{ fontSize: 13, marginBottom: 6 }}>
-                  Confira os alimentos detectados e escolha uma opção.
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {scanPreview.map((item, index) => (
-                    <div
-                      key={`${item.nome || 'item'}-${index}`}
-                      style={{
-                        padding: 8,
-                        border: '1px solid #eee',
-                        borderRadius: 6,
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: 6,
-                      }}
-                    >
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                        <strong>{item.nome}</strong>
-                        {item.quantidade && (
-                          <span className="muted">• {item.quantidade}</span>
-                        )}
-                        <span className="muted">• {formatNumber(item.calorias || 0, 0)} kcal</span>
-                        <span className="muted">• {formatNumber(item.proteina || 0, 0)} g proteína</span>
-                        <span className="muted">• {formatNumber((item.agua || 0) / 1000, 2)} L água</span>
-                      </div>
-                      <div className="row" style={{ gap: 8, justifyContent: 'flex-end' }}>
-                        <button
-                          type="button"
-                          className="ghost small"
-                          onClick={() => handleApplyScannedItem(item)}
-                        >
-                          Usar este alimento
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="row" style={{ gap: 8, marginTop: 8, justifyContent: 'flex-end' }}>
+            {Array.isArray(scanPreview) && scanPreview.length > 0 && (
+              <div className="food-scan-preview" style={{ marginTop: 8 }}>
+                <div
+                  className="row"
+                  style={{ justifyContent: 'space-between', alignItems: 'center' }}
+                >
+                  <strong style={{ fontSize: 13 }}>Alimentos identificados na foto</strong>
                   <button
                     type="button"
                     className="ghost small"
-                    onClick={handleApplyAllScannedItems}
-                  >
-                    Somar tudo e preencher a refeição
-                  </button>
-                  <button
-                    type="button"
-                    className="ghost small"
-                    onClick={() => setScanPreview([])}
+                    onClick={() => setScanPreview(null)}
                   >
                     Limpar
                   </button>
                 </div>
+
+                <ul style={{ listStyle: 'none', padding: 0, margin: '6px 0 0 0' }}>
+                  {scanPreview.map((item, index) => (
+                    <li key={index} style={{ marginBottom: 6 }}>
+                      <div style={{ fontSize: 13 }}>
+                        {item.nome} – {item.quantidade}
+                      </div>
+                      <div className="muted" style={{ fontSize: 12 }}>
+                        {item.calorias} kcal • {item.proteina} g proteína • {item.agua} ml água
+                      </div>
+                      <button
+                        type="button"
+                        className="ghost small"
+                        style={{ marginTop: 4 }}
+                        onClick={() => handleApplyScannedItem(item)}
+                      >
+                        Usar este alimento
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+
+                <button
+                  type="button"
+                  className="primary small"
+                  style={{ marginTop: 8 }}
+                  onClick={handleApplyAllScannedItems}
+                >
+                  Somar tudo e preencher a refeição
+                </button>
               </div>
             )}
 
