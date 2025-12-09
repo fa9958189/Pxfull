@@ -457,11 +457,9 @@ function FoodDiary({ userId, supabase, notify }) {
       [field]: value,
     };
 
+    // Apenas atualizar o estado local.
+    // O salvamento no Supabase será feito manualmente pelo botão.
     setBody(nextBody);
-
-    if (field === 'weightKg' || field === 'heightCm') {
-      void handleSaveBodyAndWeight(nextBody);
-    }
   };
 
   const handleSaveBodyAndWeight = async (nextBody = body) => {
@@ -977,6 +975,15 @@ function FoodDiary({ userId, supabase, notify }) {
                   ))}
               </div>
             )}
+
+            <button
+              type="button"
+              className="primary"
+              style={{ marginTop: 10 }}
+              onClick={() => handleSaveBodyAndWeight()}
+            >
+              Salvar metas e peso
+            </button>
           </div>
         </aside>
       </div>
