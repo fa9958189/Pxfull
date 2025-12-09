@@ -1284,7 +1284,7 @@ const WorkoutRoutine = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL, pushTo
             }
       }
     >
-      {/* COLUNA ESQUERDA – Rotina de Treino (aba + config + histórico + progresso) */}
+      {/* COLUNA ESQUERDA – Rotina de Treino (abas Config, Histórico, Progresso) */}
       <section className="card" style={{ marginTop: 16 }}>
         <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
           <h3 className="title" style={{ margin: 0 }}>Rotina de Treino</h3>
@@ -1974,7 +1974,6 @@ const WorkoutRoutine = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL, pushTo
         </section>
       )}
 
-      {/* Modal continua funcionando normalmente, fora dos cards */}
       <ViewWorkoutModal
         open={isViewModalOpen}
         workout={viewWorkout}
