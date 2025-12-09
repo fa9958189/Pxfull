@@ -1273,7 +1273,9 @@ const WorkoutRoutine = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL, pushTo
 
   return (
     <div
-      className="workout-card"
+      className={activeTab === "progress" || activeTab === "history"
+        ? "container single-card"
+        : "container"}
       style={
         activeTab === 'config'
           ? undefined
