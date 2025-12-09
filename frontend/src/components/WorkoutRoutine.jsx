@@ -1272,7 +1272,18 @@ const WorkoutRoutine = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL, pushTo
   } = progressStats;
 
   return (
-    <div className="workout-card">
+    <div
+      className="workout-card"
+      style={
+        activeTab === 'config'
+          ? undefined
+          : {
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 16,
+            }
+      }
+    >
       {/* COLUNA ESQUERDA – Rotina de Treino (aba + config + histórico + progresso) */}
       <section className="card" style={{ marginTop: 16 }}>
         <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
