@@ -95,11 +95,20 @@ export async function fetchWeightHistory(userId) {
     throw error;
   }
 
-  return data || [];
+  return (data || []).map((row) => ({
+    date: row.entry_date,
+    weightKg: Number(row.weight_kg),
+    recordedAt: row.recorded_at,
+  }));
 }
 
-export async function deleteWeightEntry(userId, entryDate, supabaseClient = supabase) {
-  if (!userId || !entryDate) {
+export async function deleteWeightEntry(
+  userId,
+  entryDate,
+  recordedAt,
+  supabaseClient = supabase,
+) {
+  if (!userId || !entryDate || !recordedAt) {
     throw new Error('Parâmetros inválidos para deleteWeightEntry.');
   }
 
@@ -113,6 +122,7 @@ export async function deleteWeightEntry(userId, entryDate, supabaseClient = supa
     .match({
       user_id: userId,
       entry_date: entryDate,
+      recorded_at: recordedAt,
     });
 
   if (error) {
