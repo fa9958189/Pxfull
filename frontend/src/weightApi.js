@@ -71,3 +71,26 @@ export async function fetchWeightHistory(userId) {
 
   return data || [];
 }
+
+export async function deleteWeightEntry(userId, entryDate, supabaseClient = supabase) {
+  if (!userId || !entryDate) {
+    throw new Error('Parâmetros inválidos para deleteWeightEntry.');
+  }
+
+  if (!supabaseClient) {
+    throw new Error('Supabase client não disponível em deleteWeightEntry.');
+  }
+
+  const { error } = await supabaseClient
+    .from('food_weight_history')
+    .delete()
+    .match({
+      user_id: userId,
+      entry_date: entryDate,
+    });
+
+  if (error) {
+    console.error('Erro ao excluir registro de peso:', error);
+    throw error;
+  }
+}
