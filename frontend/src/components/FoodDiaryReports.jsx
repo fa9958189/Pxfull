@@ -111,6 +111,14 @@ function FoodDiaryReports({ userId, supabase, selectedDate, goals }) {
     });
   }, [daysRange, entries]);
 
+  const last7DaysEntries = useMemo(() => {
+    const validDates = new Set(daysRange);
+    return (entries || []).filter((item) => {
+      const dateKey = item.entry_date || item.entryDate;
+      return dateKey && validDates.has(dateKey);
+    });
+  }, [entries, daysRange]);
+
   const calorieGoal = Number(goals?.calories) || 0;
   const proteinGoal = Number(goals?.protein) || 0;
   const waterGoalLiters = Number(goals?.water) || 0;
@@ -175,7 +183,7 @@ function FoodDiaryReports({ userId, supabase, selectedDate, goals }) {
   }, [heatmapRange, entriesByDate]);
 
   const foodRanking = useMemo(() => {
-    const counts = (entries || []).reduce((acc, item) => {
+    const counts = last7DaysEntries.reduce((acc, item) => {
       const foodName = item.food || item.nome || item.alimento;
       if (!foodName) return acc;
       const current = acc[foodName] || { times: 0, calories: 0 };
@@ -188,9 +196,9 @@ function FoodDiaryReports({ userId, supabase, selectedDate, goals }) {
 
     return Object.entries(counts)
       .map(([food, info]) => ({ food, times: info.times, calories: info.calories }))
-      .sort((a, b) => b.times - a.times || b.calories - a.calories)
-      .slice(0, 10);
-  }, [entries]);
+      .sort((a, b) => b.calories - a.calories || b.times - a.times)
+      .slice(0, 5);
+  }, [last7DaysEntries]);
 
   const weightTrend = useMemo(() => {
     return weightHistory
@@ -198,6 +206,10 @@ function FoodDiaryReports({ userId, supabase, selectedDate, goals }) {
       .filter((item) => item.weightKg > 0)
       .sort((a, b) => a.date.localeCompare(b.date));
   }, [weightHistory]);
+
+  const recentWeightTrend = useMemo(() => {
+    return weightTrend.slice(-10);
+  }, [weightTrend]);
 
   const adherence = useMemo(() => {
     const totalDays = dailyTotals.length || 0;
@@ -238,6 +250,22 @@ function FoodDiaryReports({ userId, supabase, selectedDate, goals }) {
     ...dailyTotals.map((day) => day.totalCalories || 0),
     1,
   );
+
+  const maxRankingCalories = Math.max(
+    ...foodRanking.map((food) => food.calories || 0),
+    1,
+  );
+
+  const maxDayCalories = Math.max(
+    ...heatmapData.map((day) => day.totalCalories || 0),
+    1,
+  );
+
+  const heatmapWeeks = heatmapData.reduce((acc, day, index) => {
+    if (index % 7 === 0) acc.push([]);
+    acc[acc.length - 1].push(day);
+    return acc;
+  }, []);
 
   return (
     <div className="card" style={{ marginTop: 8 }}>
@@ -350,51 +378,6 @@ function FoodDiaryReports({ userId, supabase, selectedDate, goals }) {
         </div>
       </div>
 
-      <div
-        style={{
-          marginTop: 12,
-          background: '#131722',
-          borderRadius: 12,
-          padding: 12,
-          border: '1px solid rgba(255,255,255,0.08)',
-        }}
-      >
-        <div style={{ fontWeight: 600, marginBottom: 8 }}>
-          Mapa de calor – calorias (últimos 30 dias)
-        </div>
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(7, minmax(0, 1fr))',
-            gap: 8,
-          }}
-        >
-          {heatmapData.map((day) => (
-            <div
-              key={day.date}
-              title={`${new Date(day.date).toLocaleDateString('pt-BR')} – ${formatNumber(day.totalCalories, 0)} kcal`}
-              style={{
-                height: 32,
-                borderRadius: 6,
-                background: day.color,
-                border: '1px solid rgba(255,255,255,0.08)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: 11,
-              }}
-            >
-              {formatNumber(day.totalCalories, 0)}
-            </div>
-          ))}
-        </div>
-        <div className="muted" style={{ fontSize: 11, marginTop: 8 }}>
-          0 kcal = cinza • 1–999 = amarelo • 1000–2000 = verde • &gt;2000 = vermelho
-        </div>
-      </div>
-
-      <div className="sep" style={{ margin: '12px 0 8px' }}></div>
-
       <div className="row" style={{ gap: 12, flexWrap: 'wrap' }}>
         <div
           style={{
@@ -457,118 +440,189 @@ function FoodDiaryReports({ userId, supabase, selectedDate, goals }) {
         </div>
       </div>
 
-      <div className="row" style={{ gap: 12, flexWrap: 'wrap', marginTop: 12 }}>
-        <div
-          style={{
-            flex: '1 1 420px',
-            background: '#131722',
-            borderRadius: 12,
-            padding: 12,
-            border: '1px solid rgba(255,255,255,0.08)',
-            minWidth: 280,
-          }}
-        >
-          <div style={{ fontWeight: 600, marginBottom: 8 }}>Alimentos mais consumidos</div>
-          {foodRanking.length > 0 ? (
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-                <thead>
-                  <tr style={{ textAlign: 'left', color: 'rgba(255,255,255,0.6)' }}>
-                    <th style={{ padding: '4px 6px' }}>Alimento</th>
-                    <th style={{ padding: '4px 6px' }}>Vezes</th>
-                    <th style={{ padding: '4px 6px' }}>Calorias totais</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {foodRanking.map((item) => (
-                    <tr key={item.food}>
-                      <td style={{ padding: '6px 6px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-                        {item.food}
-                      </td>
-                      <td
-                        style={{
-                          padding: '6px 6px',
-                          borderTop: '1px solid rgba(255,255,255,0.05)',
-                        }}
-                      >
-                        {item.times}x
-                      </td>
-                      <td
-                        style={{
-                          padding: '6px 6px',
-                          borderTop: '1px solid rgba(255,255,255,0.05)',
-                        }}
-                      >
-                        {formatNumber(item.calories, 0)} kcal
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <div className="muted" style={{ fontSize: 13 }}>
-              Registre mais refeições para ver seus alimentos mais frequentes.
-            </div>
-          )}
-        </div>
+      <div className="sep" style={{ margin: '16px 0 12px' }}></div>
 
+      <div>
+        <div style={{ fontWeight: 700, marginBottom: 8 }}>Visão detalhada do diário</div>
         <div
           style={{
-            flex: '1 1 320px',
-            background: '#131722',
-            borderRadius: 12,
-            padding: 12,
-            border: '1px solid rgba(255,255,255,0.08)',
-            minWidth: 260,
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+            gap: 12,
           }}
         >
-          <div style={{ fontWeight: 600, marginBottom: 8 }}>
-            Evolução do peso (últimos registros)
-          </div>
-          {weightTrend.length < 2 ? (
-            <div className="muted" style={{ fontSize: 13 }}>
-              Adicione mais registros de peso para visualizar a tendência.
-            </div>
-          ) : (
-            <div style={{ width: '100%', height: 160 }}>
-              <svg viewBox="0 0 100 100" preserveAspectRatio="none" style={{ width: '100%', height: '100%' }}>
-                {(() => {
-                  const weights = weightTrend.map((item) => item.weightKg);
-                  const minWeight = Math.min(...weights);
-                  const maxWeight = Math.max(...weights);
-                  const range = maxWeight - minWeight || 1;
-                  const points = weightTrend.map((item, index) => {
-                    const x = (index / Math.max(weightTrend.length - 1, 1)) * 100;
-                    const y = 100 - ((item.weightKg - minWeight) / range) * 100;
-                    return `${x},${y}`;
-                  });
+          {/* Ranking de alimentos */}
+          <div
+            style={{
+              background: '#131722',
+              borderRadius: 12,
+              padding: 12,
+              border: '1px solid rgba(255,255,255,0.08)',
+              minHeight: 220,
+            }}
+          >
+            <div style={{ fontWeight: 600, marginBottom: 6 }}>Ranking de alimentos (7 dias)</div>
+            {foodRanking.length > 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {foodRanking.map((item) => {
+                  const barWidth = Math.min((item.calories / maxRankingCalories) * 100, 100);
                   return (
-                    <>
-                      <polyline
-                        points={points.join(' ')}
-                        fill="none"
-                        stroke="#50be78"
-                        strokeWidth="2"
-                        strokeLinejoin="round"
-                        strokeLinecap="round"
-                      />
-                      {points.map((point, idx) => (
-                        <circle key={point} cx={point.split(',')[0]} cy={point.split(',')[1]} r="2" fill="#50be78">
-                          <title>
-                            {`${new Date(weightTrend[idx].date).toLocaleDateString('pt-BR')} – ${formatNumber(weightTrend[idx].weightKg, 1)} kg`}
-                          </title>
-                        </circle>
-                      ))}
-                    </>
+                    <div key={item.food}>
+                      <div className="row" style={{ justifyContent: 'space-between', fontSize: 13 }}>
+                        <span>{item.food}</span>
+                        <span className="muted">{formatNumber(item.calories, 0)} kcal</span>
+                      </div>
+                      <div
+                        style={{
+                          height: 10,
+                          borderRadius: 10,
+                          background: 'rgba(255,255,255,0.08)',
+                          overflow: 'hidden',
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: `${barWidth}%`,
+                            height: '100%',
+                            background: '#50be78',
+                            display: 'flex',
+                            alignItems: 'center',
+                            paddingLeft: 6,
+                            fontSize: 11,
+                            fontWeight: 600,
+                            color: '#0c111c',
+                          }}
+                        >
+                          {item.times}x
+                        </div>
+                      </div>
+                    </div>
                   );
-                })()}
-              </svg>
-              <div className="muted" style={{ fontSize: 11, marginTop: 6 }}>
-                Tendência baseada nos últimos {weightTrend.length} registros.
+                })}
               </div>
+            ) : (
+              <div className="muted" style={{ fontSize: 13 }}>
+                Sem dados suficientes para o ranking nos últimos 7 dias.
+              </div>
+            )}
+          </div>
+
+          {/* Heatmap de calorias dos últimos 30 dias */}
+          <div
+            style={{
+              background: '#131722',
+              borderRadius: 12,
+              padding: 12,
+              border: '1px solid rgba(255,255,255,0.08)',
+            }}
+          >
+            <div style={{ fontWeight: 600, marginBottom: 6 }}>Mapa de calor (30 dias)</div>
+            {entries.length === 0 ? (
+              <div className="muted" style={{ fontSize: 13 }}>
+                Sem registros suficientes para montar o mapa de calor.
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {heatmapWeeks.map((week, idx) => (
+                  <div key={idx} style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 6 }}>
+                    {week.map((day) => {
+                      const intensity = Math.min(day.totalCalories / maxDayCalories, 1);
+                      const background = day.totalCalories
+                        ? `rgba(80, 190, 120, ${0.25 + intensity * 0.6})`
+                        : 'rgba(255,255,255,0.04)';
+                      const borderColor = 'rgba(255,255,255,0.08)';
+                      return (
+                        <div
+                          key={day.date}
+                          title={`${new Date(day.date).toLocaleDateString('pt-BR')} – ${formatNumber(day.totalCalories, 0)} kcal`}
+                          style={{
+                            height: 26,
+                            borderRadius: 6,
+                            background,
+                            border: `1px solid ${borderColor}`,
+                            cursor: 'default',
+                          }}
+                        ></div>
+                      );
+                    })}
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="muted" style={{ fontSize: 11, marginTop: 8 }}>
+              Cada quadrado representa um dia; tons mais fortes indicam maior consumo de calorias.
             </div>
-          )}
+          </div>
+
+          {/* Mini gráfico de peso */}
+          <div
+            style={{
+              background: '#131722',
+              borderRadius: 12,
+              padding: 12,
+              border: '1px solid rgba(255,255,255,0.08)',
+              minHeight: 220,
+            }}
+          >
+            <div style={{ fontWeight: 600, marginBottom: 6 }}>Evolução do peso (recentes)</div>
+            {recentWeightTrend.length < 2 ? (
+              <div className="muted" style={{ fontSize: 13 }}>
+                Adicione mais registros de peso para visualizar a tendência.
+              </div>
+            ) : (
+              <>
+                <div style={{ width: '100%', height: 160 }}>
+                  <svg viewBox="0 0 100 60" preserveAspectRatio="none" style={{ width: '100%', height: '100%' }}>
+                    {(() => {
+                      const weights = recentWeightTrend.map((item) => item.weightKg);
+                      const minWeight = Math.min(...weights);
+                      const maxWeight = Math.max(...weights);
+                      const range = maxWeight - minWeight || 1;
+                      const points = recentWeightTrend.map((item, index) => {
+                        const x = (index / Math.max(recentWeightTrend.length - 1, 1)) * 100;
+                        const y = 60 - ((item.weightKg - minWeight) / range) * 60;
+                        return `${x},${y}`;
+                      });
+                      return (
+                        <>
+                          <polyline
+                            points={points.join(' ')}
+                            fill="none"
+                            stroke="#50be78"
+                            strokeWidth="2"
+                            strokeLinejoin="round"
+                            strokeLinecap="round"
+                          />
+                          {points.map((point, idx) => (
+                            <circle
+                              key={point}
+                              cx={point.split(',')[0]}
+                              cy={point.split(',')[1]}
+                              r="2"
+                              fill="#50be78"
+                            >
+                              <title>
+                                {`${new Date(recentWeightTrend[idx].date).toLocaleDateString('pt-BR')} – ${formatNumber(
+                                  recentWeightTrend[idx].weightKg,
+                                  1,
+                                )} kg`}
+                              </title>
+                            </circle>
+                          ))}
+                        </>
+                      );
+                    })()}
+                  </svg>
+                </div>
+                <div className="muted" style={{ fontSize: 12, marginTop: 8 }}>
+                  {`De ${formatNumber(recentWeightTrend[0].weightKg, 1)} kg para ${formatNumber(
+                    recentWeightTrend[recentWeightTrend.length - 1].weightKg,
+                    1,
+                  )} kg`}
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </div>
     </div>
