@@ -58,7 +58,7 @@ function FoodDiary({ userId, supabase, notify }) {
   const [selectedDate, setSelectedDate] = useState(
     () => new Date().toISOString().slice(0, 10)
   );
-  const [activeTab, setActiveTab] = useState('diary');
+  const [tab, setTab] = useState('diario');
 
   const [form, setForm] = useState({
     mealType: 'Almoço',
@@ -579,24 +579,24 @@ function FoodDiary({ userId, supabase, notify }) {
 
   return (
     <div className="food-diary">
-      <div className="row" style={{ gap: 12, marginBottom: 12 }}>
+      <div className="row" style={{ gap: 12, margin: '10px 0 18px' }}>
         <button
           type="button"
-          className={activeTab === 'diary' ? 'primary' : 'ghost'}
-          onClick={() => setActiveTab('diary')}
+          className={tab === 'diario' ? 'primary' : 'ghost'}
+          onClick={() => setTab('diario')}
         >
           Diário
         </button>
         <button
           type="button"
-          className={activeTab === 'reports' ? 'primary' : 'ghost'}
-          onClick={() => setActiveTab('reports')}
+          className={tab === 'relatorios' ? 'primary' : 'ghost'}
+          onClick={() => setTab('relatorios')}
         >
           Relatórios
         </button>
       </div>
 
-      {activeTab === 'diary' && (
+      {tab === 'diario' && (
         <>
           <div
             className="row"
@@ -1071,13 +1071,8 @@ function FoodDiary({ userId, supabase, notify }) {
         </>
       )}
 
-      {activeTab === 'reports' && (
-        <FoodDiaryReports
-          userId={userId}
-          supabase={supabase}
-          selectedDate={selectedDate}
-          goals={goals}
-        />
+      {tab === 'relatorios' && (
+        <FoodDiaryReports userId={userId} supabase={supabase} />
       )}
     </div>
   );
