@@ -130,7 +130,8 @@ app.post("/create-user", async (req, res) => {
         name,
         username: rawUsername,
         whatsapp,
-        role
+        role,
+        created_at: new Date().toISOString()
       });
 
     if (profileError) {
@@ -147,7 +148,8 @@ app.post("/create-user", async (req, res) => {
         role,
         email,
         username: rawUsername,
-        whatsapp
+        whatsapp,
+        created_at: new Date().toISOString()
       });
 
     if (authTableError) {
