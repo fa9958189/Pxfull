@@ -10,6 +10,7 @@ import {
   fetchWeightHistory,
   saveWeightEntry,
   saveWeightProfile,
+  deleteWeightEntry,
 } from '../weightApi';
 import { scanFood } from '../services/foodScannerApi';
 
@@ -399,6 +400,46 @@ function FoodDiary({ userId, supabase, notify }) {
       setError('Não foi possível excluir a refeição.');
       if (typeof notify === 'function') {
         notify('Não foi possível excluir a refeição.', 'error');
+      }
+    }
+  };
+
+  const handleEditWeightEntry = (entry) => {
+    if (!entry) return;
+
+    // Opcional: colocar a data selecionada igual à data do registro
+    if (entry.date) {
+      setSelectedDate(entry.date);
+    }
+
+    // Preenche o campo "Peso atual (kg)" com o valor do histórico
+    setBody((prev) => ({
+      ...prev,
+      weightKg:
+        entry.weightKg != null ? String(entry.weightKg) : prev.weightKg,
+    }));
+  };
+
+  const handleDeleteWeightEntry = async (entry) => {
+    if (!entry || !entry.date || !userId) return;
+
+    try {
+      // Usa a função do weightApi para remover o registro no Supabase
+      await deleteWeightEntry(userId, entry.date, supabase);
+
+      // Atualiza o estado local removendo o item
+      setWeightHistory((prev) =>
+        prev.filter((item) => item.date !== entry.date),
+      );
+
+      if (typeof notify === 'function') {
+        notify('Registro de peso excluído.', 'success');
+      }
+    } catch (err) {
+      console.error('Erro ao excluir registro de peso', err);
+      setError('Não foi possível excluir o registro de peso.');
+      if (typeof notify === 'function') {
+        notify('Não foi possível excluir o registro de peso.', 'error');
       }
     }
   };
@@ -900,9 +941,38 @@ function FoodDiary({ userId, supabase, notify }) {
                   .sort((a, b) => b.date.localeCompare(a.date))
                   .slice(0, 5)
                   .map((item) => (
-                    <div key={item.date}>
-                      {new Date(item.date).toLocaleDateString('pt-BR')} –{' '}
-                      {formatNumber(item.weightKg, 1)} kg
+                    <div
+                      key={item.date}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: 8,
+                        marginTop: 2,
+                      }}
+                    >
+                      <span>
+                        {new Date(item.date).toLocaleDateString('pt-BR')} –{' '}
+                        {formatNumber(item.weightKg, 1)} kg
+                      </span>
+                      <div className="table-actions">
+                        <button
+                          type="button"
+                          className="icon-button"
+                          onClick={() => handleEditWeightEntry(item)}
+                          title="Editar peso"
+                        >
+                          <span role="img" aria-label="Editar">✏️</span>
+                        </button>
+                        <button
+                          type="button"
+                          className="icon-button"
+                          onClick={() => handleDeleteWeightEntry(item)}
+                          title="Excluir peso"
+                        >
+                          <span role="img" aria-label="Excluir">🗑️</span>
+                        </button>
+                      </div>
                     </div>
                   ))}
               </div>
