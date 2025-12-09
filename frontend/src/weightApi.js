@@ -9,19 +9,20 @@ export async function saveWeightProfile({
   heightCm,
   weightKg,
 }) {
+  const now = new Date().toISOString();
+
   const { data, error } = await supabase
     .from('food_diary_profile')
-    .upsert(
-      {
-        user_id: userId,
-        calorie_goal: calorieGoal,
-        protein_goal: proteinGoal,
-        water_goal_l: waterGoalLiters,
-        height_cm: heightCm || null,
-        weight_kg: weightKg || null,
-      },
-      { onConflict: 'user_id' },
-    )
+    .insert({
+      user_id: userId,
+      calorie_goal: calorieGoal,
+      protein_goal: proteinGoal,
+      water_goal_l: waterGoalLiters,
+      height_cm: heightCm || null,
+      weight_kg: weightKg || null,
+      created_at: now,
+      updated_at: now,
+    })
     .select()
     .single();
 
@@ -31,6 +32,31 @@ export async function saveWeightProfile({
   }
 
   return data;
+}
+
+// Busca o perfil mais recente de metas + altura/peso
+export async function fetchWeightProfile(userId) {
+  const { data, error } = await supabase
+    .from('food_diary_profile')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .limit(1);
+
+  if (error) {
+    console.error('Erro ao buscar perfil do diário alimentar:', error);
+    throw error;
+  }
+
+  const profile = data && data.length > 0 ? data[0] : null;
+
+  return {
+    calorieGoal: profile?.calorie_goal ?? 2000,
+    proteinGoal: profile?.protein_goal ?? 120,
+    waterGoalLiters: profile?.water_goal_l ?? 2.5,
+    heightCm: profile?.height_cm ?? null,
+    weightKg: profile?.weight_kg ?? null,
+  };
 }
 
 // Registra uma entrada no histórico de peso

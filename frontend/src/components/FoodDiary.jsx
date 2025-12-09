@@ -9,6 +9,7 @@ import {
 import {
   fetchWeightHistory,
   saveWeightEntry,
+  fetchWeightProfile,
   saveWeightProfile,
   deleteWeightEntry,
 } from '../weightApi';
@@ -118,6 +119,53 @@ function FoodDiary({ userId, supabase, notify }) {
       console.warn(error);
     }
   }, [error]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadWeightProfile = async () => {
+      if (!userId) return;
+
+      try {
+        const profile = await fetchWeightProfile(userId);
+        if (!isMounted) return;
+
+        setGoals({
+          calories:
+            profile?.calorieGoal != null
+              ? Number(profile.calorieGoal)
+              : defaultGoals.calories,
+          protein:
+            profile?.proteinGoal != null
+              ? Number(profile.proteinGoal)
+              : defaultGoals.protein,
+          water:
+            profile?.waterGoalLiters != null
+              ? Number(profile.waterGoalLiters)
+              : defaultGoals.water,
+        });
+
+        setBody({
+          heightCm:
+            profile?.heightCm != null && profile.heightCm !== ''
+              ? String(profile.heightCm)
+              : '',
+          weightKg:
+            profile?.weightKg != null && profile.weightKg !== ''
+              ? String(profile.weightKg)
+              : '',
+        });
+      } catch (err) {
+        console.warn('Erro ao carregar perfil de metas e peso', err);
+      }
+    };
+
+    loadWeightProfile();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [userId]);
 
   useEffect(() => {
     let isMounted = true;
