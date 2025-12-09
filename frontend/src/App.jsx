@@ -488,6 +488,83 @@ const Reports = ({ transactions }) => {
       year: 'numeric',
     });
   };
+
+  // --------- Novos dados avançados de relatório ---------
+  const categoryRanking = useMemo(() => {
+    const map = {};
+
+    transactions.forEach((tx) => {
+      if (tx.type !== 'expense') return;
+      const cat = tx.category || 'Sem categoria';
+      const amount = Number(tx.amount || 0);
+      map[cat] = (map[cat] || 0) + amount;
+    });
+
+    return Object.entries(map)
+      .map(([category, total]) => ({ category, total }))
+      .sort((a, b) => b.total - a.total);
+  }, [transactions]);
+
+  const last30Days = useMemo(() => {
+    if (!transactions.length) return [];
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const map = {};
+
+    transactions.forEach((tx) => {
+      if (!tx.date) return;
+      const d = new Date(tx.date);
+      if (Number.isNaN(d.getTime())) return;
+      d.setHours(0, 0, 0, 0);
+
+      const diffDays = Math.floor(
+        (today.getTime() - d.getTime()) / (1000 * 60 * 60 * 24)
+      );
+
+      if (diffDays < 0 || diffDays >= 30) return;
+
+      const key = d.toISOString().slice(0, 10); // YYYY-MM-DD
+      const value =
+        tx.type === 'income'
+          ? Number(tx.amount || 0)
+          : -Number(tx.amount || 0);
+
+      map[key] = (map[key] || 0) + value;
+    });
+
+    const result = [];
+    for (let i = 29; i >= 0; i--) {
+      const d = new Date(today);
+      d.setDate(today.getDate() - i);
+      const key = d.toISOString().slice(0, 10);
+      result.push({
+        date: key,
+        total: map[key] || 0,
+      });
+    }
+
+    return result;
+  }, [transactions]);
+
+  const maxAbsDaily = useMemo(
+    () =>
+      last30Days.reduce(
+        (max, day) => Math.max(max, Math.abs(day.total)),
+        0
+      ) || 1,
+    [last30Days]
+  );
+
+  const heatmapWeeks = useMemo(() => {
+    const weeks = [];
+    for (let i = 0; i < last30Days.length; i += 7) {
+      weeks.push(last30Days.slice(i, i + 7));
+    }
+    return weeks;
+  }, [last30Days]);
+  // ------------------------------------------------------
   // ------------------------------------------------------------------------
 
   // GRÁFICOS JÁ EXISTENTES (mantidos)
@@ -658,6 +735,90 @@ const Reports = ({ transactions }) => {
           <canvas id="chartBalance"></canvas>
         </div>
       </div>
+
+      {Boolean(categoryRanking.length || last30Days.length) && (
+        <>
+          <h2 className="section-title" style={{ marginTop: 24 }}>
+            Visão detalhada das finanças
+          </h2>
+
+          <div className="row">
+            <div className="card" style={{ flex: 1 }}>
+              <h3 className="title">Ranking de categorias (por despesa)</h3>
+              {categoryRanking.length === 0 ? (
+                <p className="muted">
+                  Nenhuma despesa encontrada para o período selecionado.
+                </p>
+              ) : (
+                <ol className="rank-list">
+                  {categoryRanking.slice(0, 5).map((item, index) => (
+                    <li key={item.category}>
+                      <span className="rank-index">{index + 1}.</span>
+                      <div className="rank-content">
+                        <strong>{item.category}</strong>
+                        <span className="muted">
+                          {formatCurrency(item.total)}
+                        </span>
+                      </div>
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </div>
+
+            <div className="card" style={{ flex: 1 }}>
+              <h3 className="title">Mapa de calor financeiro (30 dias)</h3>
+              {last30Days.length === 0 ? (
+                <p className="muted">
+                  Cadastre lançamentos para ver o mapa de calor.
+                </p>
+              ) : (
+                <div className="heatmap">
+                  <div className="heatmap-legend">
+                    <span className="muted">Menor movimento</span>
+                    <div className="heatmap-legend-bar"></div>
+                    <span className="muted">Maior movimento</span>
+                  </div>
+                  <div className="heatmap-grid">
+                    {heatmapWeeks.map((week, weekIndex) => (
+                      <div key={weekIndex} className="heatmap-week">
+                        {week.map((day) => {
+                          const intensity = Math.abs(day.total) / maxAbsDaily;
+                          const className =
+                            intensity === 0
+                              ? 'heatmap-cell -empty'
+                              : intensity < 0.33
+                              ? 'heatmap-cell -low'
+                              : intensity < 0.66
+                              ? 'heatmap-cell -medium'
+                              : 'heatmap-cell -high';
+
+                          const dateLabel = new Date(
+                            day.date
+                          ).toLocaleDateString('pt-BR', {
+                            day: '2-digit',
+                            month: '2-digit',
+                          });
+
+                          return (
+                            <div
+                              key={day.date}
+                              className={className}
+                              title={`${dateLabel} • Total: ${formatCurrency(
+                                day.total
+                              )}`}
+                            ></div>
+                          );
+                        })}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 };
