@@ -1226,7 +1226,7 @@ function App() {
       </div>
 
       {activeView === 'transactions' && (
-        <div className="container">
+        <div className={activeTab === 'reports' ? 'container single-card' : 'container'}>
           <section className="card dashboard-card">
           <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
             <h2 className="title">Transações</h2>
@@ -1322,7 +1322,7 @@ function App() {
 
           {activeTab === 'reports' && <Reports transactions={filteredTransactions} />}
         </section>
-        {renderAgenda()}
+        {activeTab === 'form' && renderAgenda()}
 
         </div>
       )}
