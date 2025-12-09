@@ -178,13 +178,7 @@ function FoodDiary({ userId, supabase, notify }) {
         const historyFromDb = await fetchWeightHistory(userId);
         if (!isMounted) return;
 
-        setWeightHistory(
-          (historyFromDb || defaultWeightHistory).map((row) => ({
-            date: row.entry_date,
-            weightKg: Number(row.weight_kg),
-            recordedAt: row.recorded_at,
-          })),
-        );
+        setWeightHistory(historyFromDb || defaultWeightHistory);
       } catch (err) {
         console.warn('Erro ao carregar histórico de peso', err);
         if (isMounted) {
@@ -469,15 +463,18 @@ function FoodDiary({ userId, supabase, notify }) {
   };
 
   const handleDeleteWeightEntry = async (entry) => {
-    if (!entry || !entry.date || !userId) return;
+    if (!entry || !entry.date || !entry.recordedAt || !userId) return;
 
     try {
       // Usa a função do weightApi para remover o registro no Supabase
-      await deleteWeightEntry(userId, entry.date, supabase);
+      await deleteWeightEntry(userId, entry.date, entry.recordedAt, supabase);
 
       // Atualiza o estado local removendo o item
       setWeightHistory((prev) =>
-        prev.filter((item) => item.date !== entry.date),
+        prev.filter(
+          (item) =>
+            !(item.date === entry.date && item.recordedAt === entry.recordedAt),
+        ),
       );
 
       if (typeof notify === 'function') {
