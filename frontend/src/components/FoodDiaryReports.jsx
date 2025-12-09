@@ -94,6 +94,10 @@ function FoodDiaryReports({ userId, supabase, selectedDate, goals }) {
     });
   }, [daysRange, entries]);
 
+  const calorieGoal = Number(goals?.calories) || 0;
+  const proteinGoal = Number(goals?.protein) || 0;
+  const waterGoalLiters = Number(goals?.water) || 0;
+
   const stats = useMemo(() => {
     const totalCaloriesWeek = dailyTotals.reduce(
       (sum, day) => sum + day.totalCalories,
@@ -115,9 +119,32 @@ function FoodDiaryReports({ userId, supabase, selectedDate, goals }) {
     };
   }, [dailyTotals]);
 
-  const calorieGoal = Number(goals?.calories) || 0;
-  const proteinGoal = Number(goals?.protein) || 0;
-  const waterGoalLiters = Number(goals?.water) || 0;
+  const adherence = useMemo(() => {
+    const totalDays = dailyTotals.length || 0;
+    const withinCalories = calorieGoal
+      ? dailyTotals.filter(
+          (day) => getStatusFromGoal(day.totalCalories, calorieGoal) === 'Dentro da meta',
+        ).length
+      : 0;
+    const withinProtein = proteinGoal
+      ? dailyTotals.filter(
+          (day) => getStatusFromGoal(day.totalProtein, proteinGoal) === 'Dentro da meta',
+        ).length
+      : 0;
+    const withinWater = waterGoalLiters
+      ? dailyTotals.filter(
+          (day) => getStatusFromGoal(day.totalWater / 1000, waterGoalLiters) === 'Dentro da meta',
+        ).length
+      : 0;
+
+    return {
+      totalDays,
+      withinCalories,
+      withinProtein,
+      withinWater,
+      hasGoals: Boolean(calorieGoal || proteinGoal || waterGoalLiters),
+    };
+  }, [dailyTotals, calorieGoal, proteinGoal, waterGoalLiters]);
 
   if (loading) {
     return <p>Carregando relatórios...</p>;
@@ -243,30 +270,68 @@ function FoodDiaryReports({ userId, supabase, selectedDate, goals }) {
         </div>
       </div>
 
-      <div className="table">
-        <div className="table-row table-head">
-          <div>Data</div>
-          <div>Calorias</div>
-          <div>Proteína</div>
-          <div>Água</div>
-          <div>Status</div>
-        </div>
-        {dailyTotals.map((day) => {
-          const calorieStatus = getStatusFromGoal(day.totalCalories, calorieGoal);
-          const proteinStatus = getStatusFromGoal(day.totalProtein, proteinGoal);
-          return (
-            <div className="table-row" key={day.date}>
-              <div>{new Date(day.date).toLocaleDateString('pt-BR')}</div>
-              <div>{formatNumber(day.totalCalories, 0)} kcal</div>
-              <div>{formatNumber(day.totalProtein, 0)} g</div>
-              <div>{formatNumber(day.totalWater / 1000, 1)} L</div>
-              <div style={{ fontSize: 12 }}>
-                <div>Calorias: {calorieStatus}</div>
-                <div>Proteína: {proteinStatus}</div>
+      <div className="sep" style={{ margin: '12px 0 8px' }}></div>
+
+      <div className="row" style={{ gap: 12, flexWrap: 'wrap' }}>
+        <div
+          style={{
+            flex: '1 1 320px',
+            background: '#131722',
+            borderRadius: 12,
+            padding: 12,
+            border: '1px solid rgba(255,255,255,0.08)',
+            minWidth: 260,
+          }}
+        >
+          <div style={{ fontWeight: 600, marginBottom: 6 }}>Aderência às metas (7 dias)</div>
+          {adherence.hasGoals ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div className="row" style={{ justifyContent: 'space-between', fontSize: 13 }}>
+                <span className="muted">Dias com calorias dentro da meta</span>
+                <strong>{adherence.withinCalories} de {adherence.totalDays}</strong>
+              </div>
+              <div className="row" style={{ justifyContent: 'space-between', fontSize: 13 }}>
+                <span className="muted">Dias com proteína dentro da meta</span>
+                <strong>{adherence.withinProtein} de {adherence.totalDays}</strong>
+              </div>
+              <div className="row" style={{ justifyContent: 'space-between', fontSize: 13 }}>
+                <span className="muted">Dias com água dentro da meta</span>
+                <strong>{adherence.withinWater} de {adherence.totalDays}</strong>
               </div>
             </div>
-          );
-        })}
+          ) : (
+            <div className="muted" style={{ fontSize: 13 }}>
+              Configure suas metas para acompanhar sua aderência.
+            </div>
+          )}
+        </div>
+
+        <div
+          style={{
+            flex: '1 1 320px',
+            background: '#131722',
+            borderRadius: 12,
+            padding: 12,
+            border: '1px solid rgba(255,255,255,0.08)',
+            minWidth: 260,
+          }}
+        >
+          <div style={{ fontWeight: 600, marginBottom: 6 }}>Resumo da semana</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13 }}>
+            <div className="row" style={{ justifyContent: 'space-between' }}>
+              <span className="muted">Calorias médias (7 dias)</span>
+              <strong>{formatNumber(stats.avgCalories, 0)} kcal</strong>
+            </div>
+            <div className="row" style={{ justifyContent: 'space-between' }}>
+              <span className="muted">Proteína média (7 dias)</span>
+              <strong>{formatNumber(stats.avgProtein, 0)} g</strong>
+            </div>
+            <div className="row" style={{ justifyContent: 'space-between' }}>
+              <span className="muted">Água média (7 dias)</span>
+              <strong>{formatNumber(stats.totalWaterWeek / 7000, 1)} L</strong>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
