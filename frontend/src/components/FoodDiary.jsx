@@ -538,15 +538,23 @@ function FoodDiary({ userId, supabase, notify }) {
         });
 
         setWeightHistory((prev) => {
-          const filtered = prev.filter((x) => x.date !== saved.entry_date);
-          return [
-            {
-              date: saved.entry_date,
-              weightKg: Number(saved.weight_kg),
-              recordedAt: saved.recorded_at,
-            },
-            ...filtered,
-          ];
+          if (!saved) return prev;
+
+          const newItem = {
+            date: saved.entry_date,
+            weightKg: Number(saved.weight_kg),
+            recordedAt: saved.recorded_at,
+          };
+
+          const filtered = prev.filter(
+            (x) =>
+              !(
+                x.date === newItem.date &&
+                x.recordedAt === newItem.recordedAt
+              ),
+          );
+
+          return [newItem, ...filtered];
         });
 
         if (typeof notify === 'function') {
@@ -985,7 +993,7 @@ function FoodDiary({ userId, supabase, notify }) {
                   .slice(0, 5)
                   .map((item) => (
                     <div
-                      key={item.date}
+                      key={`${item.date}-${item.recordedAt}`}
                       style={{
                         display: 'flex',
                         alignItems: 'center',
