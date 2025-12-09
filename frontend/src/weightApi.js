@@ -60,8 +60,17 @@ export async function fetchWeightProfile(userId) {
 }
 
 // Registra uma entrada no histórico de peso
-export async function saveWeightEntry({ userId, entryDate, weightKg }) {
-  const { data, error } = await supabase
+export async function saveWeightEntry({
+  userId,
+  entryDate,
+  weightKg,
+  supabaseClient = supabase,
+}) {
+  if (!supabaseClient) {
+    throw new Error('Supabase client não disponível em saveWeightEntry.');
+  }
+
+  const { data, error } = await supabaseClient
     .from('food_weight_history')
     .insert([
       {
