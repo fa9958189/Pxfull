@@ -6,6 +6,7 @@ import {
   saveMeal,
   updateMeal,
 } from '../foodDiaryApi';
+import FoodDiaryReports from './FoodDiaryReports';
 import {
   fetchWeightHistory,
   saveWeightEntry,
@@ -57,6 +58,7 @@ function FoodDiary({ userId, supabase, notify }) {
   const [selectedDate, setSelectedDate] = useState(
     () => new Date().toISOString().slice(0, 10)
   );
+  const [activeTab, setActiveTab] = useState('diary');
 
   const [form, setForm] = useState({
     mealType: 'Almoço',
@@ -577,28 +579,47 @@ function FoodDiary({ userId, supabase, notify }) {
 
   return (
     <div className="food-diary">
-      <div
-        className="row"
-        style={{ justifyContent: 'space-between', alignItems: 'center' }}
-      >
-        <h4 className="title" style={{ margin: 0 }}>
-          Diário alimentar
-        </h4>
-        <div className="muted" style={{ fontSize: 12 }}>
-          Registre o que comeu e acompanhe suas metas diárias.
-        </div>
+      <div className="row" style={{ gap: 12, marginBottom: 12 }}>
+        <button
+          type="button"
+          className={activeTab === 'diary' ? 'primary' : 'ghost'}
+          onClick={() => setActiveTab('diary')}
+        >
+          Diário
+        </button>
+        <button
+          type="button"
+          className={activeTab === 'reports' ? 'primary' : 'ghost'}
+          onClick={() => setActiveTab('reports')}
+        >
+          Relatórios
+        </button>
       </div>
 
-      <div className="sep" style={{ margin: '10px 0 14px' }}></div>
-
-      <div className="food-diary-grid">
-        {/* LADO ESQUERDO – Formulário + lista do dia */}
-        <div className="food-diary-left">
-          <form
-            onSubmit={handleAddEntry}
-            className="food-diary-form"
-            autoComplete="off"
+      {activeTab === 'diary' && (
+        <>
+          <div
+            className="row"
+            style={{ justifyContent: 'space-between', alignItems: 'center' }}
           >
+            <h4 className="title" style={{ margin: 0 }}>
+              Diário alimentar
+            </h4>
+            <div className="muted" style={{ fontSize: 12 }}>
+              Registre o que comeu e acompanhe suas metas diárias.
+            </div>
+          </div>
+
+          <div className="sep" style={{ margin: '10px 0 14px' }}></div>
+
+          <div className="food-diary-grid">
+            {/* LADO ESQUERDO – Formulário + lista do dia */}
+            <div className="food-diary-left">
+              <form
+                onSubmit={handleAddEntry}
+                className="food-diary-form"
+                autoComplete="off"
+              >
             <div className="row" style={{ gap: 8, marginBottom: 8 }}>
               <div className="field" style={{ flex: 1 }}>
                 <label>Data</label>
@@ -1040,11 +1061,22 @@ function FoodDiary({ userId, supabase, notify }) {
           </div>
         </aside>
       </div>
-      {isFoodPickerOpen && (
-        <FoodPicker
-          open={isFoodPickerOpen}
-          onClose={() => setIsFoodPickerOpen(false)}
-          onSelectFood={handleSelectFood}
+          {isFoodPickerOpen && (
+            <FoodPicker
+              open={isFoodPickerOpen}
+              onClose={() => setIsFoodPickerOpen(false)}
+              onSelectFood={handleSelectFood}
+            />
+          )}
+        </>
+      )}
+
+      {activeTab === 'reports' && (
+        <FoodDiaryReports
+          userId={userId}
+          supabase={supabase}
+          selectedDate={selectedDate}
+          goals={goals}
         />
       )}
     </div>
