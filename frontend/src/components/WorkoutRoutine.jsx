@@ -1273,9 +1273,7 @@ const WorkoutRoutine = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL, pushTo
 
   return (
     <div
-      className={activeTab === "progress" || activeTab === "history"
-        ? "container single-card"
-        : "container"}
+      className={activeTab === "progress" ? "container single-card" : "container"}
       style={
         activeTab === 'config'
           ? undefined
@@ -1303,12 +1301,6 @@ const WorkoutRoutine = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL, pushTo
             onClick={() => setActiveTab('config')}
           >
             Configuração
-          </button>
-          <button
-            className={activeTab === 'history' ? 'primary' : 'ghost'}
-            onClick={() => setActiveTab('history')}
-          >
-            Histórico
           </button>
           <button
             className={activeTab === 'progress' ? 'primary' : 'ghost'}
@@ -1455,90 +1447,6 @@ const WorkoutRoutine = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL, pushTo
                 </div>
               )}
             </div>
-          </div>
-        )}
-
-        {/* Aba HISTÓRICO – copiar exatamente o conteúdo atual do bloco activeTab === 'history' */}
-        {activeTab === 'history' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <div className="row" style={{ gap: 8 }}>
-              <div style={{ display: 'flex', flexDirection: 'column' }}>
-                <label>De</label>
-                <input
-                  type="date"
-                  value={historyRange.from}
-                  onChange={(e) => setHistoryRange((prev) => ({ ...prev, from: e.target.value }))}
-                />
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column' }}>
-                <label>Até</label>
-                <input
-                  type="date"
-                  value={historyRange.to}
-                  onChange={(e) => setHistoryRange((prev) => ({ ...prev, to: e.target.value }))}
-                />
-              </div>
-            </div>
-
-            {!sessions.length && <div className="muted">Nenhum treino registrado no período.</div>}
-            {sessions.length > 0 && (
-              <div className="table">
-                {sessions.map((session) => (
-                  <details key={session.id} className="table-row" open>
-                    <summary style={{ cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 4 }}>
-                      <div className="row" style={{ justifyContent: 'space-between' }}>
-                        <div style={{ fontWeight: 600 }}>{session.name}</div>
-                        <span className="muted" style={{ fontSize: 13 }}>
-                          {formatSessionDate(session.date || session.performed_at)}
-                        </span>
-                      </div>
-                      <div className="muted" style={{ fontSize: 13 }}>
-                        {(session.muscleGroups || []).map((g) => muscleMap[g]?.label || g).join(', ')}
-                      </div>
-                      {Array.isArray(session.sportsActivities) && session.sportsActivities.length > 0 && (
-                        <div className="muted" style={{ fontSize: 13 }}>
-                          Esportes/atividades:{' '}
-                          {session.sportsActivities
-                            .map((sport) => sportsMap[sport]?.label || sport)
-                            .join(', ')}
-                        </div>
-                      )}
-                      <div className="muted" style={{ fontSize: 12 }}>
-                        {(session.exercises || []).map(formatExerciseResume).join('; ')}
-                      </div>
-                    </summary>
-                    <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 12 }}>
-                      {(session.exercises || []).map((ex) => (
-                        <div
-                          key={ex.id}
-                          style={{
-                            border: '1px solid rgba(255,255,255,0.08)',
-                            padding: 12,
-                            borderRadius: 10,
-                            background: '#0f131c',
-                          }}
-                        >
-                          <div className="row" style={{ justifyContent: 'space-between' }}>
-                            <strong>{ex.name}</strong>
-                            <span className="muted" style={{ fontSize: 12 }}>
-                              {muscleMap[ex.muscleGroupId]?.label || ex.muscleGroupId}
-                            </span>
-                          </div>
-                          <div className="muted" style={{ fontSize: 13 }}>
-                            Séries: {ex.sets} · Repetições: {ex.reps} · Peso: {ex.weight || '--'}kg · Descanso: {ex.restSeconds}s
-                          </div>
-                          {ex.notes && (
-                            <div style={{ marginTop: 6, fontSize: 13 }}>
-                              <strong>Anotações:</strong> {ex.notes}
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </details>
-                ))}
-              </div>
-            )}
           </div>
         )}
 
@@ -1782,6 +1690,89 @@ const WorkoutRoutine = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL, pushTo
               {Object.keys(progress.byMuscleGroup || {}).length === 0 && (
                 <div className="muted">Nenhum progresso registrado ainda.</div>
               )}
+            </div>
+
+            <div className="card" style={{ marginTop: 24 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                <div className="row" style={{ gap: 8 }}>
+                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    <label>De</label>
+                    <input
+                      type="date"
+                      value={historyRange.from}
+                      onChange={(e) => setHistoryRange((prev) => ({ ...prev, from: e.target.value }))}
+                    />
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    <label>Até</label>
+                    <input
+                      type="date"
+                      value={historyRange.to}
+                      onChange={(e) => setHistoryRange((prev) => ({ ...prev, to: e.target.value }))}
+                    />
+                  </div>
+                </div>
+
+                {!sessions.length && <div className="muted">Nenhum treino registrado no período.</div>}
+                {sessions.length > 0 && (
+                  <div className="table">
+                    {sessions.map((session) => (
+                      <details key={session.id} className="table-row" open>
+                        <summary style={{ cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                          <div className="row" style={{ justifyContent: 'space-between' }}>
+                            <div style={{ fontWeight: 600 }}>{session.name}</div>
+                            <span className="muted" style={{ fontSize: 13 }}>
+                              {formatSessionDate(session.date || session.performed_at)}
+                            </span>
+                          </div>
+                          <div className="muted" style={{ fontSize: 13 }}>
+                            {(session.muscleGroups || []).map((g) => muscleMap[g]?.label || g).join(', ')}
+                          </div>
+                          {Array.isArray(session.sportsActivities) && session.sportsActivities.length > 0 && (
+                            <div className="muted" style={{ fontSize: 13 }}>
+                              Esportes/atividades:{' '}
+                              {session.sportsActivities
+                                .map((sport) => sportsMap[sport]?.label || sport)
+                                .join(', ')}
+                            </div>
+                          )}
+                          <div className="muted" style={{ fontSize: 12 }}>
+                            {(session.exercises || []).map(formatExerciseResume).join('; ')}
+                          </div>
+                        </summary>
+                        <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 12 }}>
+                          {(session.exercises || []).map((ex) => (
+                            <div
+                              key={ex.id}
+                              style={{
+                                border: '1px solid rgba(255,255,255,0.08)',
+                                padding: 12,
+                                borderRadius: 10,
+                                background: '#0f131c',
+                              }}
+                            >
+                              <div className="row" style={{ justifyContent: 'space-between' }}>
+                                <strong>{ex.name}</strong>
+                                <span className="muted" style={{ fontSize: 12 }}>
+                                  {muscleMap[ex.muscleGroupId]?.label || ex.muscleGroupId}
+                                </span>
+                              </div>
+                              <div className="muted" style={{ fontSize: 13 }}>
+                                Séries: {ex.sets} · Repetições: {ex.reps} · Peso: {ex.weight || '--'}kg · Descanso: {ex.restSeconds}s
+                              </div>
+                              {ex.notes && (
+                                <div style={{ marginTop: 6, fontSize: 13 }}>
+                                  <strong>Anotações:</strong> {ex.notes}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </details>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         )}
