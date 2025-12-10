@@ -278,7 +278,7 @@ const TransactionsTable = ({ items, onEdit, onDelete }) => (
 );
 
 const EventsTable = ({ items, onEdit, onDelete }) => (
-  <div style={{ overflow: 'auto', maxHeight: 480 }}>
+  <div className="agenda-scroll">
     <table>
       <thead>
         <tr>
