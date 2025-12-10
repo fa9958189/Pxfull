@@ -229,7 +229,7 @@ const SummaryKpis = ({ totals }) => (
 );
 
 const TransactionsTable = ({ items, onEdit, onDelete }) => (
-  <div style={{ overflow: 'auto' }}>
+  <div className="transactions-scroll">
     <table>
       <thead>
         <tr>
