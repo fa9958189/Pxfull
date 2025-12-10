@@ -829,6 +829,8 @@ function App() {
 
   const isAdmin = profile?.role === 'admin';
 
+  const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
+
   const [loginForm, setLoginForm] = useState({ email: '', password: '' });
   const [loginError, setLoginError] = useState('');
   const [loginLoading, setLoginLoading] = useState(false);
@@ -1511,6 +1513,17 @@ function App() {
                 <label>WhatsApp</label>
                 <input value={userForm.whatsapp} onChange={(e) => setUserForm({ ...userForm, whatsapp: e.target.value })} placeholder="+5511999999999" />
               </div>
+              {!editingUserId && (
+                <div>
+                  <label>Criado em</label>
+                  <input
+                    type="date"
+                    value={today}
+                    readOnly
+                    disabled
+                  />
+                </div>
+              )}
               <div>
                 <label>Perfil</label>
                 <select value={userForm.role} onChange={(e) => setUserForm({ ...userForm, role: e.target.value })}>
