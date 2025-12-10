@@ -1008,45 +1008,47 @@ function FoodDiary({ userId, supabase, notify }) {
             {weightHistory.length > 0 && (
               <div className="muted" style={{ fontSize: 12, marginTop: 6 }}>
                 <div>Histórico de peso (recentes):</div>
-                {weightHistory
-                  .slice()
-                  .sort((a, b) => b.date.localeCompare(a.date))
-                  .slice(0, 5)
-                  .map((item) => (
-                    <div
-                      key={`${item.date}-${item.recordedAt}`}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        gap: 8,
-                        marginTop: 2,
-                      }}
-                    >
-                      <span>
-                        {new Date(item.date).toLocaleDateString('pt-BR')} –{' '}
-                        {formatNumber(item.weightKg, 1)} kg
-                      </span>
-                      <div className="table-actions">
-                        <button
-                          type="button"
-                          className="icon-button"
-                          onClick={() => handleEditWeightEntry(item)}
-                          title="Editar peso"
-                        >
-                          <span role="img" aria-label="Editar">✏️</span>
-                        </button>
-                        <button
-                          type="button"
-                          className="icon-button"
-                          onClick={() => handleDeleteWeightEntry(item)}
-                          title="Excluir peso"
-                        >
-                          <span role="img" aria-label="Excluir">🗑️</span>
-                        </button>
+                <div className="weight-history-scroll">
+                  {weightHistory
+                    .slice()
+                    .sort((a, b) => b.date.localeCompare(a.date))
+                    .slice(0, 5)
+                    .map((item) => (
+                      <div
+                        key={`${item.date}-${item.recordedAt}`}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: 8,
+                          marginTop: 2,
+                        }}
+                      >
+                        <span>
+                          {new Date(item.date).toLocaleDateString('pt-BR')} –{' '}
+                          {formatNumber(item.weightKg, 1)} kg
+                        </span>
+                        <div className="table-actions">
+                          <button
+                            type="button"
+                            className="icon-button"
+                            onClick={() => handleEditWeightEntry(item)}
+                            title="Editar peso"
+                          >
+                            <span role="img" aria-label="Editar">✏️</span>
+                          </button>
+                          <button
+                            type="button"
+                            className="icon-button"
+                            onClick={() => handleDeleteWeightEntry(item)}
+                            title="Excluir peso"
+                          >
+                            <span role="img" aria-label="Excluir">🗑️</span>
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    ))}
+                </div>
               </div>
             )}
 
