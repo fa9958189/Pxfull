@@ -159,6 +159,11 @@ h2.title, h3.title{ margin:0 0 10px; font-weight:600; }
 /* área de administração de usuários */
 .admin-card .user-empty{ text-align:center; margin-top:12px; }
 .admin-card table{ margin-top:4px; min-width:420px; }
+.users-table-container {
+  max-height: 220px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
 .admin-user-form .admin-user-actions{
   display:flex;
   gap:8px;
