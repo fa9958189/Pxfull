@@ -323,46 +323,48 @@ const EventsTable = ({ items, onEdit, onDelete }) => (
 const UsersTable = ({ items, onEdit, onDelete }) => (
   <div className="user-list-wrapper">
     <div className="users-table-container">
-      <table className="users-table">
-        <thead>
-          <tr>
-            <th>Usuário</th>
-            <th>Nome</th>
-            <th>WhatsApp</th>
-            <th>Perfil</th>
-            <th>Criado em</th>
-            <th className="right">Ações</th>
-          </tr>
-        </thead>
-        <tbody id="userTableBody">
-          {items.length === 0 && (
+      <div className="usuarios-scroll">
+        <table className="users-table">
+          <thead>
             <tr>
-              <td colSpan="6" className="muted user-empty">
-                Nenhum usuário cadastrado além de você.
-              </td>
+              <th>Usuário</th>
+              <th>Nome</th>
+              <th>WhatsApp</th>
+              <th>Perfil</th>
+              <th>Criado em</th>
+              <th className="right">Ações</th>
             </tr>
-          )}
-          {items.map((user) => (
-            <tr key={user.id} className={user._editing ? 'is-editing' : ''}>
-              <td>{user.username}</td>
-              <td>{user.name || '-'}</td>
-              <td>{user.whatsapp || '-'}</td>
-              <td>{user.role}</td>
-              <td>{formatDate(user.created_at)}</td>
-              <td className="right">
-                <div className="table-actions">
-                  <button className="icon-button" onClick={() => onEdit(user)} title="Editar">
-                    ✏️
-                  </button>
-                  <button className="icon-button" onClick={() => onDelete(user)} title="Excluir">
-                    🗑️
-                  </button>
-                </div>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody id="userTableBody">
+            {items.length === 0 && (
+              <tr>
+                <td colSpan="6" className="muted user-empty">
+                  Nenhum usuário cadastrado além de você.
+                </td>
+              </tr>
+            )}
+            {items.map((user) => (
+              <tr key={user.id} className={user._editing ? 'is-editing' : ''}>
+                <td>{user.username}</td>
+                <td>{user.name || '-'}</td>
+                <td>{user.whatsapp || '-'}</td>
+                <td>{user.role}</td>
+                <td>{formatDate(user.created_at)}</td>
+                <td className="right">
+                  <div className="table-actions">
+                    <button className="icon-button" onClick={() => onEdit(user)} title="Editar">
+                      ✏️
+                    </button>
+                    <button className="icon-button" onClick={() => onDelete(user)} title="Excluir">
+                      🗑️
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   </div>
 );
