@@ -47,6 +47,12 @@ import GluteoFlexoraDeitadaGif from "../assets/exercise/gluteo/Flexora deitada.g
 import GluteoNoCaboGif from "../assets/exercise/gluteo/Glúteos no Cabo.gif";
 import GluteoLevantamentoTerraGif from "../assets/exercise/gluteo/Levantamento terra.gif";
 import GluteoStiffGif from "../assets/exercise/gluteo/Stiff.gif";
+import ProgressRing from './charts/ProgressRing.jsx';
+import GoalBar from './charts/GoalBar.jsx';
+import WeightLineChart from './charts/WeightLineChart.jsx';
+import MuscleDonut from './charts/MuscleDonut.jsx';
+import TrainingHeatmap from './charts/TrainingHeatmap.jsx';
+import MiniStats from './charts/MiniStats.jsx';
 
 const muscleGroups = [
   { id: 'peito', name: 'Peito', image: PeitoImg },
@@ -779,6 +785,100 @@ const WorkoutRoutine = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL, pushTo
       bestWeekdayCount,
     };
   }, [sessions, progress, muscleMap]);
+
+  const dailyTrainingCounts = useMemo(() => {
+    const today = new Date();
+    const start = new Date(today);
+    start.setDate(start.getDate() - 29);
+
+    const buckets = {};
+    sessions.forEach((session) => {
+      if (!session.date) return;
+      const date = new Date(session.date);
+      if (Number.isNaN(date.getTime())) return;
+      if (date < start || date > today) return;
+      const key = date.toISOString().slice(0, 10);
+      buckets[key] = (buckets[key] || 0) + 1;
+    });
+
+    return Array.from({ length: 30 }).map((_, index) => {
+      const day = new Date(start);
+      day.setDate(start.getDate() + index);
+      const key = day.toISOString().slice(0, 10);
+      return { date: key, count: buckets[key] || 0 };
+    });
+  }, [sessions]);
+
+  const muscleChartData = useMemo(
+    () =>
+      Object.entries(progress.byMuscleGroup || {}).map(([muscleKey, value]) => ({
+        label: muscleMap[muscleKey]?.label || muscleKey,
+        value,
+      })),
+    [progress, muscleMap]
+  );
+
+  const heatmapMatrix = useMemo(() => {
+    const today = new Date();
+    const start = new Date(today);
+    start.setDate(start.getDate() - 27);
+
+    const matrix = Array.from({ length: 4 }).map((_, idx) => ({
+      weekLabel: `Semana ${idx + 1}`,
+      values: Array(7).fill(0),
+    }));
+
+    sessions.forEach((session) => {
+      if (!session.date) return;
+      const date = new Date(session.date);
+      if (Number.isNaN(date.getTime())) return;
+      if (date < start || date > today) return;
+
+      const diffDays = Math.floor((date - start) / (1000 * 60 * 60 * 24));
+      if (diffDays < 0 || diffDays > 27) return;
+      const weekIndex = Math.floor(diffDays / 7);
+      const weekday = (date.getDay() + 6) % 7;
+      matrix[weekIndex].values[weekday] += 1;
+    });
+
+    return matrix;
+  }, [sessions]);
+
+  const miniStatsItems = useMemo(() => {
+    const {
+      mostPerformedWorkoutName,
+      mostPerformedWorkoutCount,
+      mostWorkedMuscleLabel,
+      mostWorkedMuscleCount,
+      bestWeekdayLabel,
+      bestWeekdayCount,
+      daysTrained,
+      daysInMonth,
+    } = progressStats;
+
+    return [
+      {
+        label: 'Frequência registrada',
+        value: `${daysTrained || 0}/${daysInMonth || 0} dias`,
+        helper: daysInMonth ? `${Math.round(((daysTrained || 0) / daysInMonth) * 100)}% do mês` : null,
+      },
+      {
+        label: 'Treino mais realizado',
+        value: mostPerformedWorkoutName || '—',
+        helper: mostPerformedWorkoutCount ? `${mostPerformedWorkoutCount} treino(s)` : null,
+      },
+      {
+        label: 'Músculo mais trabalhado',
+        value: mostWorkedMuscleLabel || '—',
+        helper: mostWorkedMuscleCount ? `${mostWorkedMuscleCount} treino(s)` : null,
+      },
+      {
+        label: 'Dia com mais treinos',
+        value: bestWeekdayLabel || '—',
+        helper: bestWeekdayCount ? `${bestWeekdayCount} sessão(ões)` : null,
+      },
+    ];
+  }, [progressStats]);
 
   const sportsMap = useMemo(
     () =>
@@ -1960,6 +2060,47 @@ const WorkoutRoutine = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL, pushTo
               Cadastre ao menos um treino para montar a semana.
             </div>
           )}
+        </section>
+      )}
+
+      {/* COLUNA DIREITA – Gráficos de Progresso (só aparece na aba de progresso) */}
+      {activeTab === 'progress' && (
+        <section className="card" style={{ marginTop: 16 }}>
+          <h4 className="title" style={{ marginBottom: 12 }}>Visão analítica</h4>
+          <div className="grid" style={{ gap: 16 }}>
+            <div className="row" style={{ gap: 16, flexWrap: 'wrap' }}>
+              <div style={{ flex: 1, minWidth: 220 }}>
+                <ProgressRing
+                  value={daysTrained}
+                  max={daysInMonth}
+                  label="Frequência no mês"
+                />
+              </div>
+              <div style={{ flex: 1, minWidth: 220 }}>
+                <GoalBar
+                  current={progress.totalSessions || 0}
+                  goal={12} // meta fixa por enquanto
+                  label="Meta mensal de treinos"
+                />
+              </div>
+            </div>
+
+            <div>
+              <MiniStats items={miniStatsItems} />
+            </div>
+
+            <div>
+              <MuscleDonut title="Grupos musculares mais treinados" data={muscleChartData} />
+            </div>
+
+            <div>
+              <WeightLineChart dailyCounts={dailyTrainingCounts} />
+            </div>
+
+            <div>
+              <TrainingHeatmap title="Treinos por dia da semana" matrix={heatmapMatrix} />
+            </div>
+          </div>
         </section>
       )}
 

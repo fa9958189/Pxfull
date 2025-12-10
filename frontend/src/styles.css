@@ -823,3 +823,70 @@ canvas{ background:transparent; }
 .usuarios-scroll::-webkit-scrollbar-track {
   background: transparent;
 }
+
+/* Gráficos e analytics */
+.chart-card{
+  background:var(--card-2);
+  border:1px solid var(--border);
+  border-radius:14px;
+  padding:12px 14px;
+  box-shadow:0 10px 30px rgba(0,0,0,.28);
+}
+.chart-title{
+  font-weight:600;
+  font-size:14px;
+  margin-bottom:10px;
+}
+
+.progress-ring{ display:flex; justify-content:center; }
+.progress-ring-chart{ position:relative; width:180px; height:180px; }
+.progress-ring-center{
+  position:absolute;
+  inset:0;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  pointer-events:none;
+}
+.progress-ring-value{ font-size:28px; font-weight:700; }
+.progress-ring-helper{ font-size:12px; color:var(--muted); }
+
+.goal-bar{ display:flex; flex-direction:column; gap:10px; }
+.goal-bar-track{
+  width:100%;
+  height:14px;
+  border-radius:999px;
+  background:rgba(255,255,255,0.08);
+  overflow:hidden;
+  border:1px solid rgba(255,255,255,0.08);
+}
+.goal-bar-fill{
+  height:100%;
+  background:linear-gradient(90deg, #50be78, #facc15);
+  box-shadow:0 6px 18px rgba(80, 190, 120, 0.35);
+}
+.goal-bar-footer{ display:flex; justify-content:space-between; align-items:center; font-size:13px; }
+.goal-bar-highlight{ font-weight:700; color:#7df59c; }
+
+.chart-with-legend{ display:grid; grid-template-columns:1.2fr .8fr; gap:12px; align-items:center; }
+.chart-legend{ display:flex; flex-direction:column; gap:8px; }
+.chart-legend-item{ display:flex; align-items:center; gap:10px; padding:8px 10px; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.06); border-radius:12px; }
+.chart-legend-dot{ width:12px; height:12px; border-radius:50%; display:inline-block; box-shadow:0 0 0 1px rgba(0,0,0,0.25); }
+.chart-legend-label{ font-weight:600; font-size:13px; }
+
+.heatmap-wrapper{ width:100%; overflow-x:auto; }
+.heatmap-grid{ display:grid; grid-template-columns:80px repeat(7, 1fr); gap:8px; align-items:center; }
+.heatmap-header{ text-align:center; font-size:12px; color:var(--muted); }
+.heatmap-row-label{ font-size:12px; color:var(--muted); text-align:right; padding-right:6px; }
+.heatmap-cell{ width:100%; padding-top:100%; border-radius:6px; background:rgba(255,255,255,0.05); box-shadow:inset 0 0 0 1px rgba(0,0,0,0.2); }
+
+.mini-stats-grid{ display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:10px; }
+.mini-stat-card{ background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.06); border-radius:12px; padding:10px 12px; display:flex; flex-direction:column; gap:4px; }
+.mini-stat-label{ font-size:12px; color:var(--muted); }
+.mini-stat-value{ font-weight:700; font-size:16px; }
+.mini-stat-helper{ font-size:12px; color:var(--muted); }
+
+@media (max-width: 900px){
+  .chart-with-legend{ grid-template-columns:1fr; }
+}
