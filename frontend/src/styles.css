@@ -755,6 +755,12 @@ canvas{ background:transparent; }
   background: #2a2a2a;
 }
 
+.events-table-container {
+  max-height: 260px; /* ou o valor que já usamos em Transações */
+  overflow-y: auto;
+  padding-right: 4px; /* espaço pra barra não colar nos botões */
+}
+
 .agenda-scroll {
   max-height: 350px;
   overflow-y: auto;

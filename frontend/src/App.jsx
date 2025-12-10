@@ -278,8 +278,8 @@ const TransactionsTable = ({ items, onEdit, onDelete }) => (
 );
 
 const EventsTable = ({ items, onEdit, onDelete }) => (
-  <div className="agenda-scroll">
-    <table>
+  <div className="events-table-container">
+    <table className="events-table">
       <thead>
         <tr>
           <th>Data</th>
