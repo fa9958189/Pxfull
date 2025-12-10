@@ -1230,7 +1230,7 @@ function App() {
         if (error) throw error;
       } else {
         // Criar usuário via backend
-        const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/create-user`, {
+        const response = await fetch(`${workoutApiBase}/create-user`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
