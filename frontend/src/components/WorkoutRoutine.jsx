@@ -1569,7 +1569,7 @@ const WorkoutRoutine = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL, pushTo
 
             {!sessions.length && <div className="muted">Nenhum treino registrado no período.</div>}
             {sessions.length > 0 && (
-              <div className="table">
+              <div className="table history-list workout-history-scroll">
                 {sessions.map((session) => (
                   <details key={session.id} className="table-row" open>
                     <summary style={{ cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 4 }}>

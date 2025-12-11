@@ -896,3 +896,9 @@ canvas{ background:transparent; }
   overflow-y: auto;
   padding-right: 4px;
 }
+
+.workout-history-scroll {
+  max-height: 260px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
