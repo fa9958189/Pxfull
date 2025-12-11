@@ -5,6 +5,7 @@ import fs from "fs/promises";
 import path from "path";
 import { fileURLToPath } from "url";
 import { supabase } from "./supabase.js";
+import { startRemindersJob } from "./reminders.js";
 import { analyzeFoodImage } from "./ai/foodScanner.js";
 import {
   createWorkoutSession,
@@ -23,6 +24,9 @@ import { createSimpleUpload } from "./utils/simpleUpload.js";
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+// Inicia o job de lembretes (agenda + treinos)
+startRemindersJob({ intervalMinutes: 15 });
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

@@ -8,7 +8,7 @@ const WHATSAPP_API_TOKEN = process.env.WHATSAPP_API_TOKEN;
 /**
  * Busca eventos que são:
  *  - hoje
- *  - daqui a 5 dias
+ *  - daqui a 3 dias
  * e marca cada um com o tipo de lembrete.
  */
 export async function fetchUpcomingEvents() {
@@ -17,14 +17,14 @@ export async function fetchUpcomingEvents() {
   // Hoje (YYYY-MM-DD)
   const todayStr = now.toISOString().slice(0, 10);
 
-  // Daqui a 5 dias (YYYY-MM-DD)
-  const fiveDays = new Date(now.getTime() + 5 * 24 * 60 * 60 * 1000);
-  const fiveDaysStr = fiveDays.toISOString().slice(0, 10);
+  // Daqui a 3 dias (YYYY-MM-DD)
+  const threeDays = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
+  const threeDaysStr = threeDays.toISOString().slice(0, 10);
 
   const { data, error } = await supabase
     .from("events")
     .select("id, title, date, start, end, notes, user_id")
-    .in("date", [todayStr, fiveDaysStr])
+    .in("date", [todayStr, threeDaysStr])
     .order("date", { ascending: true });
 
   if (error) {
@@ -38,8 +38,8 @@ export async function fetchUpcomingEvents() {
     let reminderType = "other";
     if (ev.date === todayStr) {
       reminderType = "today";
-    } else if (ev.date === fiveDaysStr) {
-      reminderType = "five_days_before";
+    } else if (ev.date === threeDaysStr) {
+      reminderType = "three_days_before";
     }
     return { ...ev, reminderType };
   });
@@ -121,8 +121,8 @@ const buildReminderMessage = (event) => {
   const title = event.title || "Evento";
 
   let prefix;
-  if (event.reminderType === "five_days_before") {
-    prefix = `Lembrete: faltam 5 dias para o compromisso "${title}".`;
+  if (event.reminderType === "three_days_before") {
+    prefix = `Lembrete: faltam 3 dias para o compromisso "${title}".`;
   } else if (event.reminderType === "today") {
     prefix = `Lembrete: hoje é o dia do compromisso "${title}".`;
   } else {
