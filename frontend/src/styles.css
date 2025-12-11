@@ -890,3 +890,9 @@ canvas{ background:transparent; }
 @media (max-width: 900px){
   .chart-with-legend{ grid-template-columns:1fr; }
 }
+
+.workout-routines-scroll {
+  max-height: 230px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
