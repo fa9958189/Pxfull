@@ -166,6 +166,55 @@ app.post("/create-user", async (req, res) => {
   }
 });
 
+app.get("/api/daily-reminders", async (req, res) => {
+  const { data, error } = await supabase
+    .from("daily_reminders")
+    .select("*");
+
+  if (error) return res.status(400).json({ error });
+  res.json(data);
+});
+
+app.post("/api/daily-reminders", async (req, res) => {
+  const { user_id, title, notes, reminder_time } = req.body;
+
+  const { data, error } = await supabase
+    .from("daily_reminders")
+    .insert([{ user_id, title, notes, reminder_time }])
+    .select("*")
+    .single();
+
+  if (error) return res.status(400).json({ error });
+  res.json(data);
+});
+
+app.put("/api/daily-reminders/:id", async (req, res) => {
+  const { id } = req.params;
+  const update = req.body;
+
+  const { data, error } = await supabase
+    .from("daily_reminders")
+    .update(update)
+    .eq("id", id)
+    .select("*")
+    .single();
+
+  if (error) return res.status(400).json({ error });
+  res.json(data);
+});
+
+app.delete("/api/daily-reminders/:id", async (req, res) => {
+  const { id } = req.params;
+
+  const { error } = await supabase
+    .from("daily_reminders")
+    .delete()
+    .eq("id", id);
+
+  if (error) return res.status(400).json({ error });
+  res.json({ success: true });
+});
+
 // Helpers para novas rotas de Rotina de Treino
 const getUserIdFromRequest = (req) =>
   req.body?.user_id ||
