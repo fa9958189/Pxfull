@@ -60,8 +60,8 @@ export async function sendWhatsappMessage({ to, message }) {
     );
   }
 
-  // Garante que o número vai no formato apenas com dígitos (ex.: 5563992393705)
-  const phone = String(to).replace(/\D/g, "");
+  // z-API espera o número apenas com dígitos, no formato 55DDDNÚMERO
+  const phone = String(to || "").replace(/\D/g, "");
   if (!phone) {
     throw new Error("Número de WhatsApp inválido para envio.");
   }
@@ -70,11 +70,13 @@ export async function sendWhatsappMessage({ to, message }) {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "Client-Token": WHATSAPP_API_TOKEN, // z-API usa Client-Token no header
+      // z-API usa Client-Token no header, não Authorization: Bearer
+      "Client-Token": WHATSAPP_API_TOKEN,
     },
+    // z-API espera o campo 'phone' no body, junto com 'message'
     body: JSON.stringify({
-      phone, // campo esperado pela z-API
-      message, // texto já montado pelo sistema de lembretes
+      phone,
+      message,
     }),
   });
 
