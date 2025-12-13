@@ -7,36 +7,42 @@ export default function DailyReminders({ user }) {
   const [notes, setNotes] = useState("");
   const [time, setTime] = useState("");
 
-  async function load() {
+  async function loadReminders() {
     const res = await fetch(`/api/daily-reminders?user_id=${user.id}`);
     const data = await res.json();
     setList(data);
   }
 
-  async function addReminder() {
+  async function handleAdd() {
+    if (!title || !time) return;
+
     await fetch("/api/daily-reminders", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json"
+      },
       body: JSON.stringify({
         user_id: user.id,
         title,
-        notes,
-        reminder_time: time
+        reminder_time: time,
+        notes
       })
     });
+
     setTitle("");
-    setNotes("");
     setTime("");
-    load();
+    setNotes("");
+
+    await loadReminders();
   }
 
   async function deleteReminder(id) {
     await fetch(`/api/daily-reminders/${id}`, { method: "DELETE" });
-    load();
+    loadReminders();
   }
 
   useEffect(() => {
-    load();
+    loadReminders();
   }, []);
 
   return (
@@ -46,7 +52,7 @@ export default function DailyReminders({ user }) {
         <input placeholder="Título" value={title} onChange={e => setTitle(e.target.value)} />
         <input type="time" value={time} onChange={e => setTime(e.target.value)} />
         <input placeholder="Notas" value={notes} onChange={e => setNotes(e.target.value)} />
-        <button onClick={addReminder}>Adicionar</button>
+        <button onClick={handleAdd}>Adicionar</button>
       </div>
 
       <table>
