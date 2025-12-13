@@ -77,13 +77,22 @@ export async function sendWhatsappMessage({ to, message }) {
     );
   }
 
+  // Garante que o número vai no formato apenas com dígitos (ex.: 5563992393705)
+  const phone = String(to).replace(/\D/g, "");
+  if (!phone) {
+    throw new Error("Número de WhatsApp inválido para envio.");
+  }
+
   const response = await fetch(WHATSAPP_API_URL, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${WHATSAPP_API_TOKEN}`,
+      "Client-Token": WHATSAPP_API_TOKEN, // z-API usa Client-Token no header
     },
-    body: JSON.stringify({ to, message }),
+    body: JSON.stringify({
+      phone, // campo esperado pela z-API
+      message, // texto já montado pelo sistema de lembretes
+    }),
   });
 
   if (!response.ok) {
