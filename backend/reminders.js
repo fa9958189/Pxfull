@@ -332,11 +332,30 @@ async function fetchDailyReminders() {
   return data || [];
 }
 
-async function processDailyReminders(now) {
+function shouldSendInWindow(now, targetHHMM, intervalMinutes) {
+  if (!targetHHMM) return false;
+  const [hh, mm] = targetHHMM.split(":").map(Number);
+  if (Number.isNaN(hh) || Number.isNaN(mm)) return false;
+
+  const target = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate(),
+    hh,
+    mm,
+    0,
+    0
+  );
+
+  const intervalMs = intervalMinutes * 60 * 1000;
+  const diff = now.getTime() - target.getTime();
+  return diff >= 0 && diff < intervalMs;
+}
+
+async function processDailyReminders(now, intervalMinutes = 15) {
   const reminders = await fetchDailyReminders();
   if (!reminders.length) return;
 
-  const currentTime = now.toTimeString().slice(0, 5); // HH:MM
   const todayDate = now.toISOString().slice(0, 10);
 
   for (const rem of reminders) {
@@ -346,7 +365,10 @@ async function processDailyReminders(now) {
     const morningTime = "06:20";
 
     // --- AVISO MATINAL
-    if (currentTime === morningTime && rem.last_morning_sent !== todayDate) {
+    if (
+      shouldSendInWindow(now, morningTime, intervalMinutes) &&
+      rem.last_morning_sent !== todayDate
+    ) {
       const msg =
         `Lembrete diário:\n` +
         `Título: ${rem.title}\n` +
@@ -363,7 +385,7 @@ async function processDailyReminders(now) {
 
     // --- AVISO NA HORA EXATA
     if (
-      currentTime === rem.reminder_time &&
+      shouldSendInWindow(now, rem.reminder_time, intervalMinutes) &&
       rem.last_exact_sent !== todayDate
     ) {
       const msg =
@@ -435,7 +457,7 @@ export function startRemindersJob({ intervalMinutes = 15 } = {}) {
         console.error("Erro ao enviar lembretes de treino:", workoutErr.message);
       }
 
-      await processDailyReminders(now);
+      await processDailyReminders(now, intervalMinutes);
     } catch (err) {
       console.error("Erro no job de lembretes:", err.message);
     } finally {

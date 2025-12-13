@@ -8,9 +8,9 @@ export default function DailyReminders({ user }) {
   const [time, setTime] = useState("");
 
   async function load() {
-    const res = await fetch("/api/daily-reminders");
+    const res = await fetch(`/api/daily-reminders?user_id=${user.id}`);
     const data = await res.json();
-    setList(data.filter(r => r.user_id === user.id));
+    setList(data);
   }
 
   async function addReminder() {
