@@ -21,6 +21,8 @@ import {
 } from "./foodDiaryStorage.js";
 import { createSimpleUpload } from "./utils/simpleUpload.js";
 
+const supabaseAdmin = supabase;
+
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -170,13 +172,17 @@ app.get("/api/daily-reminders", async (req, res) => {
   const { user_id } = req.query;
   if (!user_id) return res.status(400).json({ error: "user_id é obrigatório" });
 
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from("daily_reminders")
     .select("*")
     .eq("user_id", user_id)
     .order("created_at", { ascending: false });
 
-  if (error) return res.status(400).json({ error });
+  if (error) {
+    console.error("Erro ao buscar lembretes diários:", error);
+    return res.status(400).json({ error: error.message || error });
+  }
+
   res.json(data);
 });
 
@@ -187,21 +193,23 @@ app.post("/api/daily-reminders", async (req, res) => {
     return res.status(400).json({ error: "Campos obrigatórios ausentes" });
   }
 
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from("daily_reminders")
     .insert([
       {
         user_id,
         title,
+        notes,
         reminder_time,
-        notes
+        active: true
       }
     ])
     .select()
     .single();
 
   if (error) {
-    return res.status(400).json({ error });
+    console.error("Erro ao criar lembrete diário:", error);
+    return res.status(400).json({ error: error.message || error });
   }
 
   res.json(data);
@@ -224,13 +232,24 @@ app.put("/api/daily-reminders/:id", async (req, res) => {
 
 app.delete("/api/daily-reminders/:id", async (req, res) => {
   const { id } = req.params;
+  const { user_id } = req.query;
 
-  const { error } = await supabase
+  const deleteQuery = supabaseAdmin
     .from("daily_reminders")
     .delete()
     .eq("id", id);
 
-  if (error) return res.status(400).json({ error });
+  if (user_id) {
+    deleteQuery.eq("user_id", user_id);
+  }
+
+  const { error } = await deleteQuery;
+
+  if (error) {
+    console.error("Erro ao excluir lembrete diário:", error);
+    return res.status(400).json({ error: error.message || error });
+  }
+
   res.json({ success: true });
 });
 

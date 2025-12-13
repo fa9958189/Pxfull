@@ -2,18 +2,18 @@ import { useState, useEffect } from "react";
 import "./App.css";
 
 export default function DailyReminders({ user }) {
+  const API_BASE = import.meta.env.VITE_BACKEND_URL || "http://localhost:3001";
   const [list, setList] = useState([]);
   const [title, setTitle] = useState("");
   const [notes, setNotes] = useState("");
   const [time, setTime] = useState("");
-  const apiBaseUrl = window.APP_CONFIG?.apiBaseUrl || "";
 
   async function loadReminders() {
-    const res = await fetch(`${apiBaseUrl}/api/daily-reminders?user_id=${user.id}`);
+    const res = await fetch(`${API_BASE}/api/daily-reminders?user_id=${user.id}`);
     const data = await res.json();
     if (!res.ok) {
-      console.error("DailyReminders API error", data);
-      alert(data.error || "Erro ao salvar lembrete diário");
+      alert(data?.error || "Erro ao salvar. Veja o console.");
+      console.error(data);
       return;
     }
     setList(data);
@@ -22,7 +22,7 @@ export default function DailyReminders({ user }) {
   async function handleAdd() {
     if (!title || !time) return;
 
-    const res = await fetch(`${apiBaseUrl}/api/daily-reminders`, {
+    const res = await fetch(`${API_BASE}/api/daily-reminders`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
@@ -36,8 +36,8 @@ export default function DailyReminders({ user }) {
     });
     const data = await res.json();
     if (!res.ok) {
-      console.error("DailyReminders API error", data);
-      alert(data.error || "Erro ao salvar lembrete diário");
+      alert(data?.error || "Erro ao salvar. Veja o console.");
+      console.error(data);
       return;
     }
 
@@ -49,7 +49,7 @@ export default function DailyReminders({ user }) {
   }
 
   async function deleteReminder(id) {
-    await fetch(`${apiBaseUrl}/api/daily-reminders/${id}`, { method: "DELETE" });
+    await fetch(`${API_BASE}/api/daily-reminders/${id}?user_id=${user.id}`, { method: "DELETE" });
     loadReminders();
   }
 
