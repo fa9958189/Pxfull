@@ -181,15 +181,29 @@ app.get("/api/daily-reminders", async (req, res) => {
 });
 
 app.post("/api/daily-reminders", async (req, res) => {
-  const { user_id, title, notes, reminder_time } = req.body;
+  const { user_id, title, reminder_time, notes } = req.body;
+
+  if (!user_id || !title || !reminder_time) {
+    return res.status(400).json({ error: "Campos obrigatórios ausentes" });
+  }
 
   const { data, error } = await supabase
     .from("daily_reminders")
-    .insert([{ user_id, title, notes, reminder_time }])
-    .select("*")
+    .insert([
+      {
+        user_id,
+        title,
+        reminder_time,
+        notes
+      }
+    ])
+    .select()
     .single();
 
-  if (error) return res.status(400).json({ error });
+  if (error) {
+    return res.status(400).json({ error });
+  }
+
   res.json(data);
 });
 
