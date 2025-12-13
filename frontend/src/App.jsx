@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import WorkoutRoutine from './components/WorkoutRoutine.jsx';
 import FoodDiary from './components/FoodDiary.jsx';
+import DailyReminders from './DailyReminders.jsx';
 import './styles.css';
 
 const currencyFormatter = new Intl.NumberFormat('pt-BR', {
@@ -849,7 +850,7 @@ function App() {
 
   const [txFilters, setTxFilters] = useState(defaultTxFilters);
   const [eventFilters, setEventFilters] = useState(defaultEventFilters);
-  const [activeTab, setActiveTab] = useState('form');
+  const [activeTab, setActiveTab] = useState('transactions');
   const [activeView, setActiveView] = useState('transactions');
   const workoutApiBase = window.APP_CONFIG?.apiBaseUrl || import.meta.env.VITE_API_BASE_URL;
 
@@ -1393,21 +1394,27 @@ function App() {
       </div>
 
       {activeView === 'transactions' && (
-        <div className={activeTab === 'reports' ? 'container single-card' : 'container'}>
+        <div className={activeTab === 'reports' || activeTab === 'daily' ? 'container single-card' : 'container'}>
           <section className="card dashboard-card">
           <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
             <h2 className="title">Transações</h2>
             <div className="tabs">
-              <button className={activeTab === 'form' ? 'tab active' : 'tab'} onClick={() => setActiveTab('form')}>
+              <button className={activeTab === 'transactions' ? 'tab active' : 'tab'} onClick={() => setActiveTab('transactions')}>
                 Cadastro
               </button>
               <button className={activeTab === 'reports' ? 'tab active' : 'tab'} onClick={() => setActiveTab('reports')}>
                 Relatórios
               </button>
+              <button
+                onClick={() => setActiveTab('daily')}
+                className={activeTab === 'daily' ? 'tab active' : 'tab'}
+              >
+                Lembretes Diários
+              </button>
             </div>
           </div>
 
-          {activeTab === 'form' && (
+          {activeTab === 'transactions' && (
             <div id="tab-form">
               <div className="row">
                 <div style={{ flex: 1 }}>
@@ -1489,7 +1496,8 @@ function App() {
 
           {activeTab === 'reports' && <Reports transactions={filteredTransactions} />}
         </section>
-        {activeTab === 'form' && renderAgenda()}
+        {activeTab === 'transactions' && renderAgenda()}
+        {activeTab === 'daily' && <DailyReminders user={profile} />}
 
         </div>
       )}
