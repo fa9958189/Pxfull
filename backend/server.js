@@ -167,9 +167,14 @@ app.post("/create-user", async (req, res) => {
 });
 
 app.get("/api/daily-reminders", async (req, res) => {
+  const { user_id } = req.query;
+  if (!user_id) return res.status(400).json({ error: "user_id é obrigatório" });
+
   const { data, error } = await supabase
     .from("daily_reminders")
-    .select("*");
+    .select("*")
+    .eq("user_id", user_id)
+    .order("created_at", { ascending: false });
 
   if (error) return res.status(400).json({ error });
   res.json(data);
