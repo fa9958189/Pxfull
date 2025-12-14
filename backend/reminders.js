@@ -275,16 +275,23 @@ async function fetchTodayWorkoutEntries(referenceDate = new Date()) {
   const weekday = getCurrentWeekdayIndex(referenceDate);
 
   const { data, error } = await supabase
-    .from("workout_schedule")
-    .select("id, user_id, weekday, workout_id, time, is_active")
-    .eq("weekday", weekday)
-    .eq("is_active", true);
+    .from("cronograma_de_treinos")
+    .select("id, id_do_usuario, dia_da_semana, id_do_treino, tempo, é_ativo")
+    .eq("dia_da_semana", weekday)
+    .eq("é_ativo", true);
 
   if (error) {
     throw new Error(`Erro ao buscar agenda de treino: ${error.message}`);
   }
 
-  return data || [];
+  return (data || []).map((row) => ({
+    id: row.id,
+    user_id: row.id_do_usuario,
+    weekday: row.dia_da_semana,
+    workout_id: row.id_do_treino,
+    time: row.tempo,
+    is_active: row.é_ativo,
+  }));
 }
 
 async function buildWorkoutRemindersForToday(now, dayStr, intervalMinutes) {

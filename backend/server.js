@@ -387,17 +387,27 @@ app.get("/workout-schedule", async (req, res) => {
     }
 
     const { data, error } = await supabase
-      .from("workout_schedule")
-      .select("id, user_id, weekday, workout_id, time, is_active, created_at")
-      .eq("user_id", userId)
-      .order("weekday", { ascending: true });
+      .from("cronograma_de_treinos")
+      .select("id, id_do_usuario, dia_da_semana, id_do_treino, tempo, é_ativo")
+      .eq("id_do_usuario", userId)
+      .order("dia_da_semana", { ascending: true });
 
     if (error) {
       console.error("Erro ao buscar semana de treino:", error);
       return res.status(400).json({ error: error.message });
     }
 
-    return res.json(data || []);
+    const mapped = (data || []).map((row) => ({
+      id: row.id,
+      user_id: row.id_do_usuario,
+      weekday: row.dia_da_semana,
+      workout_id: row.id_do_treino,
+      time: row.tempo,
+      is_active: row.é_ativo,
+      reminder: !!row.é_ativo,
+    }));
+
+    return res.json(mapped);
   } catch (err) {
     console.error("Erro inesperado em GET /workout-schedule:", err);
     return res.status(500).json({ error: "Erro interno no servidor" });
@@ -416,11 +426,11 @@ app.post("/workout-schedule", async (req, res) => {
 
     const normalized = (Array.isArray(schedule) ? schedule : [])
       .map((item, index) => ({
-        user_id: userId,
-        weekday: Number(item.weekday || item.dayIndex || index + 1),
-        workout_id: item.workout_id || item.workoutId || null,
-        time: item.time || null,
-        is_active:
+        id_do_usuario: userId,
+        dia_da_semana: Number(item.weekday || item.dayIndex || index + 1),
+        id_do_treino: item.workout_id || item.workoutId || null,
+        tempo: item.time || null,
+        é_ativo:
           item.is_active !== undefined
             ? item.is_active
             : item.isActive !== undefined
@@ -429,12 +439,12 @@ app.post("/workout-schedule", async (req, res) => {
             ? !!item.reminder
             : true,
       }))
-      .filter((item) => item.weekday >= 1 && item.weekday <= 7);
+      .filter((item) => item.dia_da_semana >= 1 && item.dia_da_semana <= 7);
 
     const { error: cleanupError } = await supabase
-      .from("workout_schedule")
+      .from("cronograma_de_treinos")
       .delete()
-      .eq("user_id", userId);
+      .eq("id_do_usuario", userId);
 
     if (cleanupError) {
       console.error("Erro ao limpar agenda anterior:", cleanupError);
@@ -443,7 +453,7 @@ app.post("/workout-schedule", async (req, res) => {
 
     if (normalized.length) {
       const { error } = await supabase
-        .from("workout_schedule")
+        .from("cronograma_de_treinos")
         .insert(normalized);
 
       if (error) {
