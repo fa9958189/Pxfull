@@ -3,7 +3,6 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { supabase } from "./supabase.js";
 import crypto from "crypto";
-import { DB_TABLES } from "./dbTables.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -72,7 +71,7 @@ const normalizeSportsArray = (sports) => {
 const saveTemplateToSupabase = async (template) => {
   try {
     const { data, error } = await supabase
-      .from(DB_TABLES.WORKOUT_MODELS)
+      .from("workout_templates")
       .upsert(template)
       .select()
       .single();
@@ -101,7 +100,7 @@ const saveSessionToSupabase = async (session) => {
     };
 
     const { data, error } = await supabase
-      .from(DB_TABLES.WORKOUT_SESSIONS)
+      .from("workout_sessions")
       .insert(row)
       .select(
         "id, user_id, workout_name, muscle_groups, sports_list, performed_at"
@@ -149,7 +148,7 @@ const saveReminderToSupabase = async (reminder) => {
     }
 
     const { data, error } = await supabase
-      .from(DB_TABLES.WORKOUT_REMINDERS)
+      .from("workout_reminders")
       .insert(payload)
       .select("*")
       .single();
@@ -181,7 +180,7 @@ export const listWorkoutTemplates = async (userId) => {
   if (supabaseAvailable) {
     try {
       const { data, error } = await supabase
-        .from(DB_TABLES.WORKOUT_MODELS)
+        .from("workout_templates")
         .select("*")
         .eq("userId", userId)
         .order("updatedAt", { ascending: false });
@@ -203,7 +202,7 @@ export const deleteWorkoutTemplate = async (id, userId) => {
   if (supabaseAvailable) {
     try {
       const { error } = await supabase
-        .from(DB_TABLES.WORKOUT_MODELS)
+        .from("workout_templates")
         .delete()
         .eq("id", id)
         .eq("userId", userId);
@@ -279,7 +278,7 @@ export const listWorkoutSessions = async (userId, { from, to }) => {
   if (supabaseAvailable) {
     try {
       let query = supabase
-        .from(DB_TABLES.WORKOUT_SESSIONS)
+        .from("workout_sessions")
         .select(
           "id, user_id, workout_name, muscle_groups, sports_list, performed_at"
         )

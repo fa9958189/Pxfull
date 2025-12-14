@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { DB_TABLES } from '../constants/dbTables';
 
 const getStatusFromGoal = (value, goal) => {
   if (!goal) return 'Sem meta';
@@ -40,7 +39,7 @@ function FoodDiaryReports({ userId, supabase, selectedDate, goals }) {
         const fromDateStr = fromDate.toISOString().slice(0, 10);
 
         const { data, error: dbError } = await supabase
-          .from(DB_TABLES.FOOD_ENTRIES)
+          .from('food_diary_entries')
           .select('*')
           .eq('user_id', userId)
           .gte('entry_date', fromDateStr)
@@ -52,7 +51,7 @@ function FoodDiaryReports({ userId, supabase, selectedDate, goals }) {
         setEntries(data || []);
 
         const { data: weightData, error: weightError } = await supabase
-          .from(DB_TABLES.FOOD_WEIGHT_HISTORY)
+          .from('food_weight_history')
           .select('*')
           .eq('user_id', userId)
           .order('entry_date', { ascending: true })
