@@ -1,4 +1,5 @@
 import { supabase } from './supabaseClient';
+import { DB_TABLES } from './constants/dbTables';
 
 // Salva/atualiza o perfil de metas + altura/peso atual
 export async function saveWeightProfile({
@@ -12,7 +13,7 @@ export async function saveWeightProfile({
   const now = new Date().toISOString();
 
   const { data, error } = await supabase
-    .from('food_diary_profile')
+    .from(DB_TABLES.FOOD_PROFILE)
     .insert({
       user_id: userId,
       calorie_goal: calorieGoal,
@@ -37,7 +38,7 @@ export async function saveWeightProfile({
 // Busca o perfil mais recente de metas + altura/peso
 export async function fetchWeightProfile(userId) {
   const { data, error } = await supabase
-    .from('food_diary_profile')
+    .from(DB_TABLES.FOOD_PROFILE)
     .select('*')
     .eq('user_id', userId)
     .order('created_at', { ascending: false })
@@ -71,7 +72,7 @@ export async function saveWeightEntry({
   }
 
   const { data, error } = await supabaseClient
-    .from('food_weight_history')
+    .from(DB_TABLES.FOOD_WEIGHT_HISTORY)
     .insert([
       {
         user_id: userId, // OBRIGATÓRIO, NOT NULL
@@ -93,7 +94,7 @@ export async function saveWeightEntry({
 // Busca o histórico de peso do usuário (para mostrar na tela)
 export async function fetchWeightHistory(userId) {
   const { data, error } = await supabase
-    .from('food_weight_history')
+    .from(DB_TABLES.FOOD_WEIGHT_HISTORY)
     .select('*')
     .eq('user_id', userId)
     .order('entry_date', { ascending: false })
@@ -126,7 +127,7 @@ export async function deleteWeightEntry(
   }
 
   const { error } = await supabaseClient
-    .from('food_weight_history')
+    .from(DB_TABLES.FOOD_WEIGHT_HISTORY)
     .delete()
     .match({
       user_id: userId,

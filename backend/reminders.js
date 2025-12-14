@@ -1,6 +1,7 @@
 // reminders.js
 import "dotenv/config";
 import { supabase } from "./supabase.js";
+import { DB_TABLES } from "./dbTables.js";
 
 const WHATSAPP_API_URL = process.env.WHATSAPP_API_URL;
 const WHATSAPP_API_TOKEN = process.env.WHATSAPP_API_TOKEN;
@@ -16,7 +17,7 @@ export async function fetchUpcomingEvents() {
   const tomorrowStr = tomorrow.toISOString().slice(0, 10);
 
   const { data, error } = await supabase
-    .from("events")
+    .from(DB_TABLES.EVENTS)
     .select("id, title, date, start, end, notes, user_id")
     .in("date", [todayStr, tomorrowStr])
     .order("date", { ascending: true });
@@ -36,7 +37,7 @@ export async function fetchUpcomingEvents() {
  */
 export async function fetchUserWhatsapp(userId) {
   const { data, error } = await supabase
-    .from("profiles")
+    .from(DB_TABLES.PROFILES)
     .select("whatsapp")
     .eq("id", userId)
     .maybeSingle();
@@ -194,7 +195,7 @@ const getReminderKey = (event, reminderType) => `${event.id}-${reminderType}`;
 
 async function hasReminderBeenSent(eventId, reminderKey, dayStr) {
   const { data, error } = await supabase
-    .from("event_reminder_logs")
+    .from(DB_TABLES.EVENT_REMINDER_LOGS)
     .select("id")
     .eq("event_id", eventId)
     .eq("reminder_key", reminderKey)
@@ -217,7 +218,7 @@ async function markReminderSent(eventId, reminderKey, dayStr) {
   };
 
   const { error } = await supabase
-    .from("event_reminder_logs")
+    .from(DB_TABLES.EVENT_REMINDER_LOGS)
     .upsert(payload, { onConflict: "event_id,day,reminder_key" });
 
   if (error) {
@@ -234,7 +235,7 @@ async function fetchTodayWorkoutEntries() {
   const weekday = getCurrentWeekdayIndex();
 
   const { data, error } = await supabase
-    .from("workout_schedule")
+    .from(DB_TABLES.WORKOUT_SCHEDULE)
     .select("id, user_id, weekday, workout_id, time, is_active")
     .eq("weekday", weekday)
     .eq("is_active", true);
@@ -257,7 +258,7 @@ async function buildWorkoutRemindersForToday() {
   let workoutsMap = new Map();
   if (workoutIds.length) {
     const { data: workouts, error: workoutError } = await supabase
-      .from("workout_routines")
+      .from(DB_TABLES.WORKOUT_ROUTINES)
       .select("id, name, muscle_groups")
       .in("id", workoutIds);
 
@@ -270,7 +271,7 @@ async function buildWorkoutRemindersForToday() {
 
   const userIds = Array.from(new Set(entries.map((item) => item.user_id).filter(Boolean)));
   const { data: profiles, error: profileError } = await supabase
-    .from("profiles")
+    .from(DB_TABLES.PROFILES)
     .select("id, name, whatsapp")
     .in("id", userIds);
 

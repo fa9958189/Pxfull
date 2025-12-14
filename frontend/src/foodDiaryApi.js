@@ -1,3 +1,5 @@
+import { DB_TABLES } from './constants/dbTables';
+
 const getSupabaseClient = (supabaseClient) => {
   if (supabaseClient) return supabaseClient;
 
@@ -68,7 +70,7 @@ export const saveMeal = async (
   };
 
   const { data, error } = await supabase
-    .from('food_diary_entries')
+    .from(DB_TABLES.FOOD_ENTRIES)
     .insert([payload])
     .select()
     .single();
@@ -80,7 +82,7 @@ export const saveMeal = async (
 export const fetchMealsByDate = async (userId, date, supabaseClient) => {
   const supabase = getSupabaseClient(supabaseClient);
   const { data, error } = await supabase
-    .from('food_diary_entries')
+    .from(DB_TABLES.FOOD_ENTRIES)
     .select('*')
     .eq('user_id', userId)
     .eq('entry_date', date)
@@ -105,7 +107,7 @@ export const updateMeal = async (entryId, newData, supabaseClient) => {
   };
 
   const { data, error } = await supabase
-    .from('food_diary_entries')
+    .from(DB_TABLES.FOOD_ENTRIES)
     .update(payload)
     .eq('id', entryId)
     .select()
@@ -118,7 +120,7 @@ export const updateMeal = async (entryId, newData, supabaseClient) => {
 export const deleteMeal = async (entryId, supabaseClient) => {
   const supabase = getSupabaseClient(supabaseClient);
   const { error } = await supabase
-    .from('food_diary_entries')
+    .from(DB_TABLES.FOOD_ENTRIES)
     .delete()
     .eq('id', entryId);
 

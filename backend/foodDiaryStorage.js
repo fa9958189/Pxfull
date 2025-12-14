@@ -1,4 +1,5 @@
 import { supabase } from "./supabase.js";
+import { DB_TABLES } from "./dbTables.js";
 
 const DEFAULT_GOALS = {
   calories: 2000,
@@ -55,7 +56,7 @@ export const getFoodDiaryState = async (userId) => {
   const entriesByDate = {};
 
   const { data: entries, error: entriesError } = await supabase
-    .from("food_diary_entries")
+    .from(DB_TABLES.FOOD_ENTRIES)
     .select("*")
     .eq("user_id", userId)
     .order("entry_date", { ascending: false })
@@ -72,7 +73,7 @@ export const getFoodDiaryState = async (userId) => {
   });
 
   const { data: profile, error: profileError } = await supabase
-    .from("food_diary_profile")
+    .from(DB_TABLES.FOOD_PROFILE)
     .select("calorie_goal, protein_goal, water_goal_l, height_cm, weight_kg")
     .eq("user_id", userId)
     .maybeSingle();
@@ -83,7 +84,7 @@ export const getFoodDiaryState = async (userId) => {
   const body = mapBodyFromProfile(profile);
 
   const { data: weightRows, error: weightError } = await supabase
-    .from("food_weight_history")
+    .from(DB_TABLES.FOOD_WEIGHT_HISTORY)
     .select("entry_date, weight_kg, recorded_at")
     .eq("user_id", userId)
     .order("entry_date", { ascending: false });
@@ -126,7 +127,7 @@ export const saveFoodDiaryState = async (userId, state = {}) => {
   };
 
   const { error: profileError } = await supabase
-    .from("food_diary_profile")
+    .from(DB_TABLES.FOOD_PROFILE)
     .upsert(profilePayload, { onConflict: "user_id" });
 
   if (profileError) throw profileError;
@@ -137,7 +138,7 @@ export const saveFoodDiaryState = async (userId, state = {}) => {
 
   if (latestWeight) {
     const { data: existingEntry, error: findError } = await supabase
-      .from("food_weight_history")
+      .from(DB_TABLES.FOOD_WEIGHT_HISTORY)
       .select("id")
       .eq("user_id", userId)
       .eq("entry_date", latestWeight.date)
@@ -147,14 +148,14 @@ export const saveFoodDiaryState = async (userId, state = {}) => {
 
     if (existingEntry) {
       const { error: updateError } = await supabase
-        .from("food_weight_history")
+        .from(DB_TABLES.FOOD_WEIGHT_HISTORY)
         .update({ weight_kg: Number(latestWeight.weightKg) })
         .eq("id", existingEntry.id);
 
       if (updateError) throw updateError;
     } else {
       const { error: insertError } = await supabase
-        .from("food_weight_history")
+        .from(DB_TABLES.FOOD_WEIGHT_HISTORY)
         .insert({
           user_id: userId,
           entry_date: latestWeight.date,
