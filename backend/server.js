@@ -187,9 +187,22 @@ app.get("/api/daily-reminders", async (req, res) => {
 });
 
 app.post("/api/daily-reminders", async (req, res) => {
-  const { user_id, title, reminder_time, notes } = req.body;
+  const token = req.headers.authorization?.replace("Bearer ", "");
 
-  if (!user_id || !title || !reminder_time) {
+  if (!token) {
+    return res.status(401).json({ error: "Token não enviado" });
+  }
+
+  const { data: userData, error: userError } = await supabase.auth.getUser(token);
+  const user = userData?.user;
+
+  if (userError || !user) {
+    return res.status(401).json({ error: "Usuário não autenticado" });
+  }
+
+  const { title, reminder_time, notes } = req.body;
+
+  if (!title || !reminder_time) {
     return res.status(400).json({ error: "Campos obrigatórios ausentes" });
   }
 
@@ -197,7 +210,7 @@ app.post("/api/daily-reminders", async (req, res) => {
     .from("daily_reminders")
     .insert([
       {
-        user_id,
+        user_id: user.id,
         title,
         notes,
         reminder_time,

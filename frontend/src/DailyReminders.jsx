@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import "./App.css";
+import { supabase } from "./supabaseClient";
 
 export default function DailyReminders({ user }) {
   const API_BASE = import.meta.env.VITE_BACKEND_URL || "http://localhost:3001";
@@ -22,13 +23,22 @@ export default function DailyReminders({ user }) {
   async function handleAdd() {
     if (!title || !time) return;
 
+    const {
+      data: { session }
+    } = await supabase.auth.getSession();
+
+    if (!session?.access_token) {
+      alert("Faça login novamente para criar lembretes.");
+      return;
+    }
+
     const res = await fetch(`${API_BASE}/api/daily-reminders`, {
       method: "POST",
       headers: {
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${session.access_token}`
       },
       body: JSON.stringify({
-        user_id: user.id,
         title,
         reminder_time: time,
         notes
