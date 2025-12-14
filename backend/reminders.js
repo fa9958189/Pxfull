@@ -369,6 +369,22 @@ async function buildWorkoutRemindersForToday(now, dayStr, intervalMinutes) {
   return reminders;
 }
 
+export async function checkWorkoutReminders(intervalMinutes = 15) {
+  const now = new Date();
+  const dayStr = now.toISOString().slice(0, 10);
+
+  const workoutReminders = await buildWorkoutRemindersForToday(
+    now,
+    dayStr,
+    intervalMinutes
+  );
+
+  for (const reminder of workoutReminders) {
+    await sendWhatsappMessage(reminder);
+    await markWorkoutReminderSent(reminder.scheduleId, reminder.userId, dayStr);
+  }
+}
+
 /**
  * Inicia um agendador simples que verifica eventos e dispara mensagens.
  * @param {{ intervalMinutes?: number }} options
@@ -414,19 +430,7 @@ export function startRemindersJob({ intervalMinutes = 15 } = {}) {
       }
 
       try {
-        const workoutReminders = await buildWorkoutRemindersForToday(
-          now,
-          dayStr,
-          intervalMinutes
-        );
-        for (const reminder of workoutReminders) {
-          await sendWhatsappMessage(reminder);
-          await markWorkoutReminderSent(
-            reminder.scheduleId,
-            reminder.userId,
-            dayStr
-          );
-        }
+        await checkWorkoutReminders(intervalMinutes);
       } catch (workoutErr) {
         console.error("Erro ao enviar lembretes de treino:", workoutErr.message);
       }
@@ -443,6 +447,30 @@ export function startRemindersJob({ intervalMinutes = 15 } = {}) {
   const intervalId = setInterval(tick, intervalMinutes * 60 * 1000);
 
   return () => clearInterval(intervalId);
+}
+
+export function startWorkoutReminderWorker() {
+  console.log("⏰ Worker de lembretes de treino iniciado");
+
+  // roda imediatamente uma vez ao subir (opcional mas recomendado)
+  (async () => {
+    try {
+      console.log("🔎 Checando lembretes de treino (boot)...");
+      await checkWorkoutReminders();
+    } catch (err) {
+      console.error("Erro no worker (boot):", err?.message || err);
+    }
+  })();
+
+  // e depois roda a cada 60 segundos
+  setInterval(async () => {
+    try {
+      console.log("🔎 Checando lembretes de treino...");
+      await checkWorkoutReminders();
+    } catch (err) {
+      console.error("Erro no worker:", err?.message || err);
+    }
+  }, 60 * 1000);
 }
 
 // Se rodar direto: `node reminders.js`
