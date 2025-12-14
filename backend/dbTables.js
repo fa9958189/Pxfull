@@ -1,5 +1,5 @@
 export const DB_TABLES = {
-  EVENTS: "eventos",
+  EVENTS: "events",
   PROFILES: "perfis",
   PROFILES_AUTH: "perfis_autenticação",
   EVENT_REMINDER_LOGS: "event_reminder_logs",
