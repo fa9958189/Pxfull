@@ -3,6 +3,8 @@ import "dotenv/config";
 import { supabase } from "./supabase.js";
 import { DB_TABLES } from "./dbTables.js";
 
+const EVENT_REMINDER_LOGS_TABLE = "event_reminder_logs";
+
 const WHATSAPP_API_URL = process.env.WHATSAPP_API_URL;
 const WHATSAPP_API_TOKEN = process.env.WHATSAPP_API_TOKEN;
 
@@ -195,7 +197,7 @@ const getReminderKey = (event, reminderType) => `${event.id}-${reminderType}`;
 
 async function hasReminderBeenSent(eventId, reminderKey, dayStr) {
   const { data, error } = await supabase
-    .from(DB_TABLES.EVENT_REMINDER_LOGS)
+    .from(EVENT_REMINDER_LOGS_TABLE)
     .select("id")
     .eq("event_id", eventId)
     .eq("reminder_key", reminderKey)
@@ -218,7 +220,7 @@ async function markReminderSent(eventId, reminderKey, dayStr) {
   };
 
   const { error } = await supabase
-    .from(DB_TABLES.EVENT_REMINDER_LOGS)
+    .from(EVENT_REMINDER_LOGS_TABLE)
     .upsert(payload, { onConflict: "event_id,day,reminder_key" });
 
   if (error) {
