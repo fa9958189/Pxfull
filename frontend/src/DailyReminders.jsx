@@ -4,13 +4,19 @@ import { supabase } from "./supabaseClient";
 
 export default function DailyReminders({ user }) {
   const API_BASE = import.meta.env.VITE_BACKEND_URL || "http://localhost:3001";
+  const authUserId = user?.id_de_autenticacao || user?.auth_user_id || user?.id;
   const [list, setList] = useState([]);
   const [title, setTitle] = useState("");
   const [notes, setNotes] = useState("");
   const [time, setTime] = useState("");
 
   async function loadReminders() {
-    const res = await fetch(`${API_BASE}/api/daily-reminders?user_id=${user.id}`);
+    if (!authUserId) {
+      alert("Usuário sem id_de_autenticacao (auth id).");
+      return;
+    }
+
+    const res = await fetch(`${API_BASE}/api/daily-reminders?user_id=${authUserId}`);
     const data = await res.json();
     if (!res.ok) {
       alert(data?.error || "Erro ao salvar. Veja o console.");
@@ -22,6 +28,11 @@ export default function DailyReminders({ user }) {
 
   async function handleAdd() {
     if (!title || !time) return;
+
+    if (!authUserId) {
+      alert("Usuário sem id_de_autenticacao (auth id).");
+      return;
+    }
 
     const {
       data: { session }
@@ -59,7 +70,12 @@ export default function DailyReminders({ user }) {
   }
 
   async function deleteReminder(id) {
-    await fetch(`${API_BASE}/api/daily-reminders/${id}?user_id=${user.id}`, { method: "DELETE" });
+    if (!authUserId) {
+      alert("Usuário sem id_de_autenticacao (auth id).");
+      return;
+    }
+
+    await fetch(`${API_BASE}/api/daily-reminders/${id}?user_id=${authUserId}`, { method: "DELETE" });
     loadReminders();
   }
 
