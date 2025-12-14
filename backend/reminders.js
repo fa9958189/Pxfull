@@ -1,9 +1,78 @@
-// reminders.js
 import "dotenv/config";
-import { supabase } from "./supabase.js";
+import { createClient } from "@supabase/supabase-js";
+
+const SUPABASE_URL =
+  process.env.SUPABASE_URL || "https://gklpjwjzluqsnavwhwxf.supabase.co";
+const SUPABASE_SERVICE_ROLE_KEY =
+  process.env.SUPABASE_SERVICE_ROLE_KEY ||
+  process.env.SUPABASE_SERVICE_ROLE ||
+  process.env.SUPABASE_KEY ||
+  process.env.SUPABASE_ANON_KEY;
+
+const WORKOUT_SCHEDULE_TABLE =
+  process.env.WORKOUT_SCHEDULE_TABLE || "cronograma_de_treinos";
+
+const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+  auth: { persistSession: false },
+});
 
 const WHATSAPP_API_URL = process.env.WHATSAPP_API_URL;
 const WHATSAPP_API_TOKEN = process.env.WHATSAPP_API_TOKEN;
+
+// Z-API
+const ZAPI_INSTANCE_ID = process.env.ZAPI_INSTANCE_ID;
+const ZAPI_TOKEN = process.env.ZAPI_TOKEN;
+const ZAPI_CLIENT_TOKEN = process.env.ZAPI_CLIENT_TOKEN;
+const ZAPI_BASE_URL = process.env.ZAPI_BASE_URL || "https://api.z-api.io";
+
+const sentCache = new Map();
+
+/**
+ * Utilidades de data/hora
+ */
+function nowBR() {
+  return new Date(
+    new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" })
+  );
+}
+
+function hhmm(dt) {
+  const hours = String(dt.getHours()).padStart(2, "0");
+  const minutes = String(dt.getMinutes()).padStart(2, "0");
+  return `${hours}:${minutes}`;
+}
+
+function getWeekdayBR(dt) {
+  const jsDay = dt.getDay();
+  return jsDay === 0 ? 7 : jsDay;
+}
+
+function normalizeTimeToHHMM(timeValue) {
+  if (!timeValue) return null;
+  if (typeof timeValue === "string") return timeValue.slice(0, 5);
+  return null;
+}
+
+function shouldSendOnce(key) {
+  const ts = sentCache.get(key);
+  const now = Date.now();
+  if (ts && now - ts < 70_000) return false;
+  sentCache.set(key, now);
+  return true;
+}
+
+function logSupabaseInfo() {
+  const urlHost = (SUPABASE_URL || "")
+    .replace("https://", "")
+    .replace("http://", "")
+    .split("/")[0];
+  console.log("🔎 SUPABASE_URL host:", urlHost);
+  console.log("🔎 Tabela agenda:", WORKOUT_SCHEDULE_TABLE);
+}
+
+// --------------------
+// Eventos (lógica original)
+// --------------------
 
 /**
  * Busca eventos de hoje e de amanhã.
@@ -60,7 +129,6 @@ export async function sendWhatsappMessage({ to, message }) {
     );
   }
 
-  // z-API espera o número apenas com dígitos, no formato 55DDDNÚMERO
   const phone = String(to || "").replace(/\D/g, "");
   if (!phone) {
     throw new Error("Número de WhatsApp inválido para envio.");
@@ -70,10 +138,8 @@ export async function sendWhatsappMessage({ to, message }) {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      // z-API usa Client-Token no header, não Authorization: Bearer
       "Client-Token": WHATSAPP_API_TOKEN,
     },
-    // z-API espera o campo 'phone' no body, junto com 'message'
     body: JSON.stringify({
       phone,
       message,
@@ -235,197 +301,7 @@ function isWithinWindow(now, target, windowMinutes) {
   return diff >= 0 && diff < windowMinutes * 60 * 1000;
 }
 
-async function hasWorkoutReminderBeenSent(scheduleId, dayStr) {
-  const { data, error } = await supabase
-    .from("workout_reminder_logs")
-    .select("id")
-    .eq("schedule_id", scheduleId)
-    .eq("day", dayStr)
-    .maybeSingle();
-
-  if (error) {
-    throw new Error(`Erro ao verificar log de treino: ${error.message}`);
-  }
-  return Boolean(data);
-}
-
-async function markWorkoutReminderSent(scheduleId, userId, dayStr) {
-  const payload = {
-    schedule_id: scheduleId,
-    user_id: userId,
-    day: dayStr,
-    sent_at: new Date().toISOString(),
-  };
-
-  const { error } = await supabase
-    .from("workout_reminder_logs")
-    .upsert(payload, { onConflict: "schedule_id,day" });
-
-  if (error) {
-    throw new Error(`Erro ao registrar log de treino: ${error.message}`);
-  }
-}
-
-const getDbWeekday = (date = new Date()) => {
-  const js = date.getDay();
-  return js === 0 ? 7 : js;
-};
-
-const hhmmFromDate = (date = new Date()) => {
-  const hh = String(date.getHours()).padStart(2, "0");
-  const mm = String(date.getMinutes()).padStart(2, "0");
-  return `${hh}:${mm}`;
-};
-
-const normalizeTimeToHHMM = (t) => {
-  if (!t) return null;
-  return String(t).slice(0, 5);
-};
-
-const yyyyMmDd = (date = new Date()) => {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
-};
-
-async function fetchTodayWorkoutEntries(referenceDate = new Date()) {
-  const weekday = getDbWeekday(referenceDate);
-
-  const { data, error } = await supabase
-    .from("cronograma_de_treinos")
-    .select("id, user_id, weekday, workout_id, time, is_active")
-    .eq("weekday", weekday)
-    .eq("is_active", true);
-
-  if (error) {
-    throw new Error(`Erro ao buscar agenda de treino: ${error.message}`);
-  }
-
-  return (data || []).map((row) => ({
-    id: row.id,
-    user_id: row.user_id,
-    weekday: row.weekday,
-    workout_id: row.workout_id,
-    time: row.time,
-    is_active: row.is_active,
-  }));
-}
-
-async function buildWorkoutRemindersForToday(now, dayStr) {
-  const dbWeekday = getDbWeekday(now);
-  const nowHHMM = hhmmFromDate(now);
-
-  console.log(
-    `🔎 Checando lembretes de treino... weekday=${dbWeekday} hora=${nowHHMM}`
-  );
-
-  const entries = await fetchTodayWorkoutEntries(now);
-  console.log(`📅 Registros ativos encontrados: ${entries.length}`);
-
-  const entriesAtTime = entries.filter(
-    (entry) => normalizeTimeToHHMM(entry.time) === nowHHMM
-  );
-
-  if (!entriesAtTime.length) return [];
-
-  const workoutIds = Array.from(
-    new Set(entriesAtTime.map((item) => item.workout_id).filter(Boolean))
-  );
-
-  let workoutsMap = new Map();
-  if (workoutIds.length) {
-    const { data: workouts, error: workoutError } = await supabase
-      .from("workout_routines")
-      .select("id, name, muscle_groups")
-      .in("id", workoutIds);
-
-    if (workoutError) {
-      throw new Error(`Erro ao buscar treinos: ${workoutError.message}`);
-    }
-
-    workoutsMap = new Map((workouts || []).map((item) => [item.id, item]));
-  }
-
-  const userIds = Array.from(
-    new Set(entriesAtTime.map((item) => item.user_id).filter(Boolean))
-  );
-  const { data: profiles, error: profileError } = await supabase
-    .from("profiles")
-    .select("id, name, whatsapp")
-    .in("id", userIds);
-
-  if (profileError) {
-    throw new Error(`Erro ao buscar perfis: ${profileError.message}`);
-  }
-
-  const profilesMap = new Map((profiles || []).map((item) => [item.id, item]));
-
-  const reminders = [];
-
-  for (const entry of entriesAtTime) {
-    const workout = workoutsMap.get(entry.workout_id);
-    const profile = profilesMap.get(entry.user_id);
-
-    if (!workout || !profile || !profile.whatsapp) continue;
-
-    const alreadySent = await hasWorkoutReminderBeenSent(entry.id, dayStr);
-    if (alreadySent) {
-      console.log(
-        `⏭️ Lembrete já enviado hoje para schedule_id=${entry.id}, pulando.`
-      );
-      continue;
-    }
-
-    const timePart = normalizeTimeToHHMM(entry.time)
-      ? ` às ${normalizeTimeToHHMM(entry.time)}`
-      : "";
-    const muscleGroups = (workout.muscle_groups || "")
-      .split(",")
-      .map((item) => item.trim())
-      .filter(Boolean)
-      .join(", ") || "-";
-
-    const message =
-      `Bom dia, ${profile.name || ""}! Hoje é dia de ${workout.name}${timePart}. ` +
-      `Grupos musculares: ${muscleGroups}. Bora treinar! 💪`;
-
-    reminders.push({
-      to: profile.whatsapp,
-      message,
-      scheduleId: entry.id,
-      userId: entry.user_id,
-    });
-  }
-
-  return reminders;
-}
-
-export async function checkWorkoutReminders() {
-  const now = new Date();
-  const dayStr = yyyyMmDd(now);
-
-  const workoutReminders = await buildWorkoutRemindersForToday(now, dayStr);
-
-  for (const reminder of workoutReminders) {
-    console.log(
-      `📲 Enviando lembrete para user_id ${reminder.userId} (schedule ${reminder.scheduleId})...`
-    );
-    try {
-      await sendWhatsappMessage(reminder);
-      await markWorkoutReminderSent(reminder.scheduleId, reminder.userId, dayStr);
-      console.log("✅ Lembrete enviado com sucesso.");
-    } catch (err) {
-      console.error("❌ Erro ao enviar lembrete de treino:", err);
-    }
-  }
-}
-
-/**
- * Inicia um agendador simples que verifica eventos e dispara mensagens.
- * @param {{ intervalMinutes?: number }} options
- */
-export function startRemindersJob({ intervalMinutes = 15 } = {}) {
+export async function startRemindersJob({ intervalMinutes = 15 } = {}) {
   let isRunning = false;
 
   const tick = async () => {
@@ -464,12 +340,6 @@ export function startRemindersJob({ intervalMinutes = 15 } = {}) {
         await sendWhatsappMessage({ to: whatsapp, message });
         await markReminderSent(event.id, reminderKey, dayStr);
       }
-
-      try {
-        await checkWorkoutReminders(intervalMinutes);
-      } catch (workoutErr) {
-        console.error("Erro ao enviar lembretes de treino:", workoutErr.message);
-      }
     } catch (err) {
       console.error("Erro no job de lembretes:", err.message);
     } finally {
@@ -477,39 +347,136 @@ export function startRemindersJob({ intervalMinutes = 15 } = {}) {
     }
   };
 
-  // roda uma vez ao subir
   tick();
-  // e depois de X em X minutos
   const intervalId = setInterval(tick, intervalMinutes * 60 * 1000);
 
   return () => clearInterval(intervalId);
 }
 
-export function startWorkoutReminderWorker() {
-  console.log("⏰ Worker de lembretes de treino iniciado");
+// --------------------
+// Worker de treinos
+// --------------------
 
-  // roda imediatamente uma vez ao subir (opcional mas recomendado)
-  (async () => {
-    try {
-      console.log("🔎 Checando lembretes de treino (boot)...");
-      await checkWorkoutReminders();
-    } catch (err) {
-      console.error("Erro no worker (boot):", err?.message || err);
-    }
-  })();
+async function sendWhatsAppMessage({ phone, message }) {
+  const url = `${ZAPI_BASE_URL}/instances/${ZAPI_INSTANCE_ID}/token/${ZAPI_TOKEN}/send-text`;
 
-  // e depois roda a cada 20 segundos
-  setInterval(async () => {
-    try {
-      console.log("🔎 Checando lembretes de treino...");
-      await checkWorkoutReminders();
-    } catch (err) {
-      console.error("Erro no worker:", err?.message || err);
-    }
-  }, 20 * 1000);
+  const body = {
+    phone,
+    message,
+  };
+
+  const headers = {
+    "Content-Type": "application/json",
+  };
+
+  if (ZAPI_CLIENT_TOKEN) headers["Client-Token"] = ZAPI_CLIENT_TOKEN;
+
+  const resp = await fetch(url, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(body),
+  });
+
+  const text = await resp.text().catch(() => "");
+  return { ok: resp.ok, status: resp.status, body: text };
 }
 
-// Se rodar direto: `node reminders.js`
+export async function checkWorkoutRemindersOnce() {
+  const dt = nowBR();
+  const weekday = getWeekdayBR(dt);
+  const currentHHMM = hhmm(dt);
+
+  console.log(`⏱️ Checando lembretes... weekday=${weekday} hora=${currentHHMM}`);
+
+  const { data, error } = await supabase
+    .from(WORKOUT_SCHEDULE_TABLE)
+    .select("id, user_id, weekday, time, is_active")
+    .eq("weekday", weekday)
+    .eq("is_active", true);
+
+  if (error) {
+    console.error("❌ Erro ao buscar agenda de treino (Supabase):", error);
+    return;
+  }
+
+  const total = data?.length || 0;
+  console.log(`📋 Registros ativos encontrados hoje: ${total}`);
+
+  const due = (data || []).filter(
+    (row) => normalizeTimeToHHMM(row.time) === currentHHMM
+  );
+
+  if (due.length === 0) {
+    console.log(
+      `ℹ️ Registros hoje: ${total}, mas nenhum bateu no minuto ${currentHHMM}.`
+    );
+    return;
+  }
+
+  console.log(`✅ Encontrados ${due.length} lembrete(s) para agora (${currentHHMM}).`);
+
+  for (const row of due) {
+    const key = `${row.user_id}-${row.weekday}-${currentHHMM}`;
+    if (!shouldSendOnce(key)) {
+      console.log("⏭️ Ignorando duplicado (anti-spam):", key);
+      continue;
+    }
+
+    const { data: profile, error: profileErr } = await supabase
+      .from("profiles")
+      .select("whatsapp, name")
+      .eq("id", row.user_id)
+      .maybeSingle();
+
+    if (profileErr) {
+      console.error("❌ Erro buscando telefone do usuário:", profileErr);
+      continue;
+    }
+
+    const phone = profile?.whatsapp;
+    if (!phone) {
+      console.warn("⚠️ Usuário sem telefone cadastrado. user_id=", row.user_id);
+      continue;
+    }
+
+    const message = `🏋️ Lembrete de treino: tá na hora! (${currentHHMM})`;
+
+    console.log("📤 Enviando WhatsApp via Z-API:", { phone, message });
+
+    const z = await sendWhatsAppMessage({ phone, message });
+
+    if (!z.ok) {
+      console.error("❌ Z-API falhou:", { status: z.status, body: z.body });
+    } else {
+      console.log("✅ Z-API OK:", { status: z.status, body: z.body });
+    }
+  }
+}
+
+let workoutWorkerIntervalId = null;
+
+export function startWorkoutReminderWorker() {
+  if (workoutWorkerIntervalId) {
+    return workoutWorkerIntervalId;
+  }
+
+  console.log("🟢 Worker de lembretes iniciado");
+  logSupabaseInfo();
+
+  checkWorkoutRemindersOnce().catch((e) =>
+    console.error("❌ Erro no worker (boot):", e)
+  );
+
+  workoutWorkerIntervalId = setInterval(() => {
+    checkWorkoutRemindersOnce().catch((e) =>
+      console.error("❌ Erro no worker:", e)
+    );
+  }, 10_000);
+
+  return workoutWorkerIntervalId;
+}
+
 if (process.argv[1] && process.argv[1].endsWith("reminders.js")) {
   startRemindersJob();
+  startWorkoutReminderWorker();
 }
