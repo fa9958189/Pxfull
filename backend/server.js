@@ -5,6 +5,7 @@ import fs from "fs/promises";
 import path from "path";
 import { fileURLToPath } from "url";
 import { supabase } from "./supabase.js";
+import { DB_TABLES } from "./dbTables.js";
 import { startRemindersJob } from "./reminders.js";
 import { analyzeFoodImage } from "./ai/foodScanner.js";
 import {
@@ -128,7 +129,7 @@ app.post("/create-user", async (req, res) => {
 
     // 2) Grava em profiles
     const { error: profileError } = await supabase
-      .from("profiles")
+      .from(DB_TABLES.PROFILES)
       .insert({
         id: userId,
         name,
@@ -144,7 +145,7 @@ app.post("/create-user", async (req, res) => {
 
     // 3) Grava em profiles_auth
     const { error: authTableError } = await supabase
-      .from("profiles_auth")
+      .from(DB_TABLES.PROFILES_AUTH)
       .insert({
         auth_id: userId,
         name,
@@ -251,7 +252,7 @@ app.get("/api/workout/routines", async (req, res) => {
     }
 
     const { data, error } = await supabase
-      .from("workout_routines")
+      .from(DB_TABLES.WORKOUT_ROUTINES)
       .select("id, user_id, name, muscle_group, sports, sports_list, created_at")
       .eq("user_id", userId)
       .order("created_at", { ascending: true });
@@ -286,7 +287,7 @@ app.post("/api/workout/routines", async (req, res) => {
     };
 
     const { data, error } = await supabase
-      .from("workout_routines")
+      .from(DB_TABLES.WORKOUT_ROUTINES)
       .insert(insertPayload)
       .select("id, user_id, name, muscle_group, sports, sports_list, created_at")
       .single();
@@ -321,7 +322,7 @@ app.put("/api/workout/routines/:id", async (req, res) => {
     };
 
     const { data, error } = await supabase
-      .from("workout_routines")
+      .from(DB_TABLES.WORKOUT_ROUTINES)
       .update(updatePayload)
       .eq("id", id)
       .eq("user_id", userId)
@@ -350,7 +351,7 @@ app.delete("/api/workout/routines/:id", async (req, res) => {
     }
 
     const { error: scheduleError } = await supabase
-      .from("workout_schedule")
+      .from(DB_TABLES.WORKOUT_SCHEDULE)
       .delete()
       .eq("workout_id", id)
       .eq("user_id", userId);
@@ -360,7 +361,7 @@ app.delete("/api/workout/routines/:id", async (req, res) => {
     }
 
     const { error } = await supabase
-      .from("workout_routines")
+      .from(DB_TABLES.WORKOUT_ROUTINES)
       .delete()
       .eq("id", id)
       .eq("user_id", userId);
@@ -387,7 +388,7 @@ app.get("/workout-schedule", async (req, res) => {
     }
 
     const { data, error } = await supabase
-      .from("workout_schedule")
+      .from(DB_TABLES.WORKOUT_SCHEDULE)
       .select("id, user_id, weekday, workout_id, time, is_active, created_at")
       .eq("user_id", userId)
       .order("weekday", { ascending: true });
@@ -432,7 +433,7 @@ app.post("/workout-schedule", async (req, res) => {
       .filter((item) => item.weekday >= 1 && item.weekday <= 7);
 
     const { error: cleanupError } = await supabase
-      .from("workout_schedule")
+      .from(DB_TABLES.WORKOUT_SCHEDULE)
       .delete()
       .eq("user_id", userId);
 
@@ -443,7 +444,7 @@ app.post("/workout-schedule", async (req, res) => {
 
     if (normalized.length) {
       const { error } = await supabase
-        .from("workout_schedule")
+        .from(DB_TABLES.WORKOUT_SCHEDULE)
         .insert(normalized);
 
       if (error) {
@@ -573,7 +574,7 @@ app.delete("/api/workouts/templates/:id", async (req, res) => {
     // Exclusão de template de treino
     if (supabase) {
       const { error } = await supabase
-        .from("workout_templates")
+        .from(DB_TABLES.WORKOUT_MODELS)
         .delete()
         .eq("id", id);
 

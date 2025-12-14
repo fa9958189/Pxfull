@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import WorkoutRoutine from './components/WorkoutRoutine.jsx';
 import FoodDiary from './components/FoodDiary.jsx';
+import { DB_TABLES } from './constants/dbTables';
 import './styles.css';
 
 const currencyFormatter = new Intl.NumberFormat('pt-BR', {
@@ -870,7 +871,7 @@ function App() {
                   try {
                     // 1) Transações do usuário logado
                     let txQuery = client
-                      .from('transactions')
+                      .from(DB_TABLES.TRANSACTIONS)
                       .select('id, user_id, type, amount, description, category, date, created_at')
                       .eq('user_id', session.user.id)
                       .order('date', { ascending: false });
@@ -909,7 +910,7 @@ function App() {
 
                     // 2) Eventos (agenda) do usuário logado
                     const { data: eventData, error: evError } = await client
-                      .from('events')
+                      .from(DB_TABLES.EVENTS)
                       .select('*')
                       .eq('user_id', session.user.id)
                       .order('date', { ascending: false });
@@ -920,7 +921,7 @@ function App() {
                     let userData = [];
                     if (profile?.role === 'admin') {
                       const { data, error } = await client
-                        .from('profiles_auth')
+                        .from(DB_TABLES.PROFILES_AUTH)
                         .select('*')
                         .order('name', { ascending: true });
 
@@ -1048,7 +1049,7 @@ function App() {
 
                     // 2) Buscar o registro correspondente em profiles_auth pelo auth_id
                     const { data: authProfile, error: authProfileError } = await client
-                      .from('profiles_auth')
+                      .from(DB_TABLES.PROFILES_AUTH)
                       .select('id, name, role, auth_id, email')
                       .eq('auth_id', authUser.id)
                       .single();
@@ -1126,7 +1127,7 @@ function App() {
                           try {
                             // Envia para a tabela transactions no Supabase
                             const { data, error } = await client
-                              .from('transactions')
+                              .from(DB_TABLES.TRANSACTIONS)
                               .upsert({
                                 id: payload.id,
                                 user_id: session.user.id,      // <- mesmo id gravado em profiles_auth.id
@@ -1161,7 +1162,11 @@ function App() {
     persistLocalSnapshot({ transactions: newList });
     try {
       if (client && session) {
-        const { error } = await client.from('transactions').delete().eq('id', tx.id).eq('user_id', session.user.id);
+        const { error } = await client
+          .from(DB_TABLES.TRANSACTIONS)
+          .delete()
+          .eq('id', tx.id)
+          .eq('user_id', session.user.id);
         if (error) throw error;
       }
       pushToast('Transação removida.', 'success');
@@ -1181,7 +1186,7 @@ function App() {
     setEventForm(defaultEventForm);
     try {
       if (client && session) {
-        const { error } = await client.from('events').upsert({
+        const { error } = await client.from(DB_TABLES.EVENTS).upsert({
           id: payload.id,
           title: payload.title,
           date: payload.date,
@@ -1206,7 +1211,11 @@ function App() {
     persistLocalSnapshot({ events: newList });
     try {
       if (client && session) {
-        const { error } = await client.from('events').delete().eq('id', ev.id).eq('user_id', session.user.id);
+        const { error } = await client
+          .from(DB_TABLES.EVENTS)
+          .delete()
+          .eq('id', ev.id)
+          .eq('user_id', session.user.id);
         if (error) throw error;
       }
       pushToast('Evento removido.', 'success');
@@ -1230,7 +1239,10 @@ function App() {
         id: editingUserId
       };
       if (editingUserId) {
-        const { error } = await client.from('profiles_auth').update(payload).eq('id', editingUserId);
+        const { error } = await client
+          .from(DB_TABLES.PROFILES_AUTH)
+          .update(payload)
+          .eq('id', editingUserId);
         if (error) throw error;
       } else {
         // Criar usuário via backend
@@ -1267,7 +1279,10 @@ function App() {
       return;
     }
     try {
-      const { error } = await client.from('profiles_auth').delete().eq('id', user.id);
+      const { error } = await client
+        .from(DB_TABLES.PROFILES_AUTH)
+        .delete()
+        .eq('id', user.id);
       if (error) throw error;
       pushToast('Usuário removido.', 'success');
       loadRemoteData();
