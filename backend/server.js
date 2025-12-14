@@ -674,7 +674,7 @@ CREATE TABLE IF NOT EXISTS public.workout_routines (
   created_at timestamptz DEFAULT now()
 );
 
-CREATE TABLE IF NOT EXISTS public.workout_schedule (
+CREATE TABLE IF NOT EXISTS public.cronograma_de_treinos (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id uuid NOT NULL,
   weekday smallint NOT NULL CHECK (weekday >= 1 AND weekday <= 7),
