@@ -25,48 +25,22 @@ const ZAPI_TOKEN = process.env.ZAPI_TOKEN;
 const ZAPI_CLIENT_TOKEN = process.env.ZAPI_CLIENT_TOKEN;
 const ZAPI_BASE_URL = process.env.ZAPI_BASE_URL || "https://api.z-api.io";
 
-const sentCache = new Map();
+const TZ = "America/Sao_Paulo";
 
-/**
- * Utilidades de data/hora
- */
-function nowBR() {
-  return new Date(
-    new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" })
-  );
-}
-
-function hhmm(dt) {
-  const hours = String(dt.getHours()).padStart(2, "0");
-  const minutes = String(dt.getMinutes()).padStart(2, "0");
-  return `${hours}:${minutes}`;
-}
-
-function getWeekdayBR(dt) {
-  const jsDay = dt.getDay();
-  return jsDay === 0 ? 7 : jsDay;
-}
-
-function normalizeTimeToHHMM(timeValue) {
-  if (!timeValue) return null;
-  if (typeof timeValue === "string") return timeValue.slice(0, 5);
-  return null;
-}
-
-function shouldSendOnce(key) {
-  const ts = sentCache.get(key);
-  const now = Date.now();
-  if (ts && now - ts < 70_000) return false;
-  sentCache.set(key, now);
-  return true;
+const sentInMinute = new Set();
+function makeKey(userId, weekday, hhmm) {
+  return `${userId}|${weekday}|${hhmm}`;
 }
 
 function logSupabaseInfo() {
-  const urlHost = (SUPABASE_URL || "")
+  const rawUrl =
+    process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || SUPABASE_URL;
+  const urlHost = (rawUrl || "")
     .replace("https://", "")
     .replace("http://", "")
     .split("/")[0];
-  console.log("🔎 SUPABASE_URL host:", urlHost);
+
+  console.log("SUPABASE_URL host:", urlHost || "(vazio)");
   console.log("🔎 Tabela agenda:", WORKOUT_SCHEDULE_TABLE);
 }
 
@@ -357,7 +331,11 @@ export async function startRemindersJob({ intervalMinutes = 15 } = {}) {
 // Worker de treinos
 // --------------------
 
-async function sendWhatsAppMessage({ phone, message }) {
+const MINUTE_CACHE_TTL_MS = 70_000;
+
+export async function sendZapiMessage({ phone, message }) {
+  if (!phone) throw new Error("Telefone vazio");
+
   const url = `${ZAPI_BASE_URL}/instances/${ZAPI_INSTANCE_ID}/token/${ZAPI_TOKEN}/send-text`;
 
   const body = {
@@ -381,75 +359,104 @@ async function sendWhatsAppMessage({ phone, message }) {
   return { ok: resp.ok, status: resp.status, body: text };
 }
 
-export async function checkWorkoutRemindersOnce() {
-  const dt = nowBR();
-  const weekday = getWeekdayBR(dt);
-  const currentHHMM = hhmm(dt);
+function getNowInSaoPaulo() {
+  return new Date(new Date().toLocaleString("en-US", { timeZone: TZ }));
+}
 
-  console.log(`⏱️ Checando lembretes... weekday=${weekday} hora=${currentHHMM}`);
+function getWeekday(now) {
+  return now.getDay();
+}
 
+function formatHHMM(now) {
+  const hours = String(now.getHours()).padStart(2, "0");
+  const minutes = String(now.getMinutes()).padStart(2, "0");
+  return `${hours}:${minutes}`;
+}
+
+function formatTempo(value) {
+  return String(value ?? "").slice(0, 5);
+}
+
+async function loadRemindersForNow(weekday) {
   const { data, error } = await supabase
     .from(WORKOUT_SCHEDULE_TABLE)
-    .select("id, user_id, weekday, time, is_active")
-    .eq("weekday", weekday)
+    .select("id_usuario, dia_da_semana, tempo, is_active")
+    .eq("dia_da_semana", weekday)
     .eq("is_active", true);
 
-  if (error) {
+  if (error) throw error;
+  return data || [];
+}
+
+async function getUserPhone(userId) {
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("whatsapp")
+    .eq("id", userId)
+    .single();
+
+  if (error) throw error;
+  return data?.whatsapp || null;
+}
+
+export async function checkWorkoutRemindersOnce() {
+  const now = getNowInSaoPaulo();
+  const weekday = getWeekday(now);
+  const hhmm = formatHHMM(now);
+
+  console.log(`⏱ Checando lembretes... weekday=${weekday} hora=${hhmm}`);
+
+  let reminders = [];
+
+  try {
+    reminders = await loadRemindersForNow(weekday);
+    console.log(`📋 Registros ativos encontrados hoje: ${reminders.length}`);
+  } catch (error) {
     console.error("❌ Erro ao buscar agenda de treino (Supabase):", error);
     return;
   }
 
-  const total = data?.length || 0;
-  console.log(`📋 Registros ativos encontrados hoje: ${total}`);
+  for (const reminder of reminders) {
+    const tempo = formatTempo(reminder.tempo);
+    if (!tempo || tempo !== hhmm) continue;
 
-  const due = (data || []).filter(
-    (row) => normalizeTimeToHHMM(row.time) === currentHHMM
-  );
-
-  if (due.length === 0) {
-    console.log(
-      `ℹ️ Registros hoje: ${total}, mas nenhum bateu no minuto ${currentHHMM}.`
-    );
-    return;
-  }
-
-  console.log(`✅ Encontrados ${due.length} lembrete(s) para agora (${currentHHMM}).`);
-
-  for (const row of due) {
-    const key = `${row.user_id}-${row.weekday}-${currentHHMM}`;
-    if (!shouldSendOnce(key)) {
+    const key = makeKey(reminder.id_usuario, weekday, hhmm);
+    if (sentInMinute.has(key)) {
       console.log("⏭️ Ignorando duplicado (anti-spam):", key);
       continue;
     }
 
-    const { data: profile, error: profileErr } = await supabase
-      .from("profiles")
-      .select("whatsapp, name")
-      .eq("id", row.user_id)
-      .maybeSingle();
+    sentInMinute.add(key);
+    setTimeout(() => sentInMinute.delete(key), MINUTE_CACHE_TTL_MS);
 
-    if (profileErr) {
-      console.error("❌ Erro buscando telefone do usuário:", profileErr);
+    let phone;
+    try {
+      phone = await getUserPhone(reminder.id_usuario);
+    } catch (err) {
+      console.error("❌ Erro buscando telefone do usuário:", err);
       continue;
     }
 
-    const phone = profile?.whatsapp;
     if (!phone) {
-      console.warn("⚠️ Usuário sem telefone cadastrado. user_id=", row.user_id);
+      console.warn("⚠️ Usuário sem telefone cadastrado. user_id=", reminder.id_usuario);
       continue;
     }
 
-    const message = `🏋️ Lembrete de treino: tá na hora! (${currentHHMM})`;
+    const message = `📌 Lembrete: seu treino está marcado para agora (${hhmm}). Bora! 💪`;
 
     console.log("📤 Enviando WhatsApp via Z-API:", { phone, message });
 
-    const z = await sendWhatsAppMessage({ phone, message });
+    const z = await sendZapiMessage({ phone, message });
 
     if (!z.ok) {
       console.error("❌ Z-API falhou:", { status: z.status, body: z.body });
     } else {
       console.log("✅ Z-API OK:", { status: z.status, body: z.body });
     }
+  }
+
+  if (sentInMinute.size > 5000) {
+    sentInMinute.clear();
   }
 }
 
