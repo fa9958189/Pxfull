@@ -4,7 +4,7 @@ import cors from "cors";
 import fs from "fs/promises";
 import path from "path";
 import { fileURLToPath } from "url";
-import { supabase } from "./supabase.js";
+import { supabaseAdmin, supabaseAuth } from "./supabase.js";
 import { startRemindersJob } from "./reminders.js";
 import { analyzeFoodImage } from "./ai/foodScanner.js";
 import {
@@ -21,7 +21,7 @@ import {
 } from "./foodDiaryStorage.js";
 import { createSimpleUpload } from "./utils/simpleUpload.js";
 
-const supabaseAdmin = supabase;
+const supabase = supabaseAdmin;
 
 const app = express();
 app.use(cors());
@@ -193,8 +193,10 @@ app.post("/api/daily-reminders", async (req, res) => {
     return res.status(401).json({ error: "Token não enviado" });
   }
 
-  const { data: userData, error: userError } = await supabase.auth.getUser(token);
-  const user = userData?.user;
+  const {
+    data: { user },
+    error: userError
+  } = await supabaseAuth.auth.getUser(token);
 
   if (userError || !user) {
     return res.status(401).json({ error: "Usuário não autenticado" });
