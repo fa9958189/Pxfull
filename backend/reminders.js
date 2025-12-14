@@ -303,107 +303,6 @@ async function buildWorkoutRemindersForToday() {
     .filter(Boolean);
 }
 
-async function getUserProfile(userId) {
-  const { data, error } = await supabase
-    .from("profiles")
-    .select("*")
-    .eq("id", userId)
-    .maybeSingle();
-
-  if (error) {
-    console.error("Erro ao buscar perfil do usuário:", error);
-    return null;
-  }
-
-  return data || null;
-}
-
-async function fetchDailyReminders() {
-  const { data, error } = await supabase
-    .from("daily_reminders")
-    .select("*")
-    .eq("active", true);
-
-  if (error) {
-    console.error("Erro ao buscar daily reminders:", error);
-    return [];
-  }
-
-  return data || [];
-}
-
-function shouldSendInWindow(now, targetHHMM, intervalMinutes) {
-  if (!targetHHMM) return false;
-  const [hh, mm] = targetHHMM.split(":").map(Number);
-  if (Number.isNaN(hh) || Number.isNaN(mm)) return false;
-
-  const target = new Date(
-    now.getFullYear(),
-    now.getMonth(),
-    now.getDate(),
-    hh,
-    mm,
-    0,
-    0
-  );
-
-  const intervalMs = intervalMinutes * 60 * 1000;
-  const diff = now.getTime() - target.getTime();
-  return diff >= 0 && diff < intervalMs;
-}
-
-async function processDailyReminders(now, intervalMinutes = 15) {
-  const reminders = await fetchDailyReminders();
-  if (!reminders.length) return;
-
-  const todayDate = now.toISOString().slice(0, 10);
-
-  for (const rem of reminders) {
-    const user = await getUserProfile(rem.user_id);
-    if (!user || !user.whatsapp) continue;
-
-    const morningTime = "06:20";
-
-    // --- AVISO MATINAL
-    if (
-      shouldSendInWindow(now, morningTime, intervalMinutes) &&
-      rem.last_morning_sent !== todayDate
-    ) {
-      const msg =
-        `Lembrete diário:\n` +
-        `Título: ${rem.title}\n` +
-        `Horário: ${rem.reminder_time}\n` +
-        (rem.notes ? `Notas: ${rem.notes}` : "");
-
-      await sendWhatsappMessage({ to: user.whatsapp, message: msg });
-
-      await supabase
-        .from("daily_reminders")
-        .update({ last_morning_sent: todayDate })
-        .eq("id", rem.id);
-    }
-
-    // --- AVISO NA HORA EXATA
-    if (
-      shouldSendInWindow(now, rem.reminder_time, intervalMinutes) &&
-      rem.last_exact_sent !== todayDate
-    ) {
-      const msg =
-        `Lembrete diário (hora do compromisso):\n` +
-        `Título: ${rem.title}\n` +
-        `Horário: ${rem.reminder_time}\n` +
-        (rem.notes ? `Notas: ${rem.notes}` : "");
-
-      await sendWhatsappMessage({ to: user.whatsapp, message: msg });
-
-      await supabase
-        .from("daily_reminders")
-        .update({ last_exact_sent: todayDate })
-        .eq("id", rem.id);
-    }
-  }
-}
-
 /**
  * Inicia um agendador simples que verifica eventos e dispara mensagens.
  * @param {{ intervalMinutes?: number }} options
@@ -456,8 +355,6 @@ export function startRemindersJob({ intervalMinutes = 15 } = {}) {
       } catch (workoutErr) {
         console.error("Erro ao enviar lembretes de treino:", workoutErr.message);
       }
-
-      await processDailyReminders(now, intervalMinutes);
     } catch (err) {
       console.error("Erro no job de lembretes:", err.message);
     } finally {

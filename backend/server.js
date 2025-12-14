@@ -4,7 +4,7 @@ import cors from "cors";
 import fs from "fs/promises";
 import path from "path";
 import { fileURLToPath } from "url";
-import { supabaseAdmin, supabaseAuth } from "./supabase.js";
+import { supabase } from "./supabase.js";
 import { startRemindersJob } from "./reminders.js";
 import { analyzeFoodImage } from "./ai/foodScanner.js";
 import {
@@ -20,8 +20,6 @@ import {
   saveFoodDiaryState,
 } from "./foodDiaryStorage.js";
 import { createSimpleUpload } from "./utils/simpleUpload.js";
-
-const supabase = supabaseAdmin;
 
 const app = express();
 app.use(cors());
@@ -166,106 +164,6 @@ app.post("/create-user", async (req, res) => {
     console.error("Erro inesperado em /create-user:", err);
     return res.status(500).json({ error: "Erro interno no servidor" });
   }
-});
-
-app.get("/api/daily-reminders", async (req, res) => {
-  const { user_id } = req.query;
-  if (!user_id) return res.status(400).json({ error: "user_id é obrigatório" });
-
-  const { data, error } = await supabaseAdmin
-    .from("daily_reminders")
-    .select("*")
-    .eq("user_id", user_id)
-    .order("created_at", { ascending: false });
-
-  if (error) {
-    console.error("Erro ao buscar lembretes diários:", error);
-    return res.status(400).json({ error: error.message || error });
-  }
-
-  res.json(data);
-});
-
-app.post("/api/daily-reminders", async (req, res) => {
-  const token = req.headers.authorization?.replace("Bearer ", "");
-
-  if (!token) {
-    return res.status(401).json({ error: "Token não enviado" });
-  }
-
-  const {
-    data: { user },
-    error: userError
-  } = await supabaseAuth.auth.getUser(token);
-
-  if (userError || !user) {
-    return res.status(401).json({ error: "Usuário não autenticado" });
-  }
-
-  const { title, reminder_time, notes } = req.body;
-
-  if (!title || !reminder_time) {
-    return res.status(400).json({ error: "Campos obrigatórios ausentes" });
-  }
-
-  const { data, error } = await supabaseAdmin
-    .from("daily_reminders")
-    .insert([
-      {
-        user_id: user.id,
-        title,
-        notes,
-        reminder_time,
-        active: true
-      }
-    ])
-    .select()
-    .single();
-
-  if (error) {
-    console.error("Erro ao criar lembrete diário:", error);
-    return res.status(400).json({ error: error.message || error });
-  }
-
-  res.json(data);
-});
-
-app.put("/api/daily-reminders/:id", async (req, res) => {
-  const { id } = req.params;
-  const update = req.body;
-
-  const { data, error } = await supabase
-    .from("daily_reminders")
-    .update(update)
-    .eq("id", id)
-    .select("*")
-    .single();
-
-  if (error) return res.status(400).json({ error });
-  res.json(data);
-});
-
-app.delete("/api/daily-reminders/:id", async (req, res) => {
-  const { id } = req.params;
-  const { user_id } = req.query;
-
-  const deleteQuery = supabaseAdmin
-    .from("daily_reminders")
-    .delete()
-    .eq("id", id);
-
-  if (user_id) {
-    deleteQuery.eq("user_id", user_id);
-  }
-
-  const { error } = await deleteQuery;
-
-  if (error) {
-    console.error("Erro ao excluir lembrete diário:", error);
-    return res.status(400).json({ error: error.message || error });
-  }
-
-  res.json({ success: true });
 });
 
 // Helpers para novas rotas de Rotina de Treino
