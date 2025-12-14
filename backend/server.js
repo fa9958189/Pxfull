@@ -5,7 +5,11 @@ import fs from "fs/promises";
 import path from "path";
 import { fileURLToPath } from "url";
 import { supabase } from "./supabase.js";
-import { startRemindersJob, startWorkoutReminderWorker } from "./reminders.js";
+import {
+  sendZapiMessage,
+  startRemindersJob,
+  startWorkoutReminderWorker,
+} from "./reminders.js";
 import { analyzeFoodImage } from "./ai/foodScanner.js";
 import {
   createWorkoutSession,
@@ -28,6 +32,19 @@ app.use(express.json());
 // Inicia o job de lembretes (agenda + treinos)
 startRemindersJob({ intervalMinutes: 15 });
 startWorkoutReminderWorker();
+
+app.get("/debug/zapi-test", async (req, res) => {
+  try {
+    const phone = req.query.phone;
+    const message = req.query.message || "Teste Z-API: chegou!";
+
+    await sendZapiMessage({ phone, message });
+
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
