@@ -275,10 +275,10 @@ async function fetchTodayWorkoutEntries(referenceDate = new Date()) {
   const weekday = getCurrentWeekdayIndex(referenceDate);
 
   const { data, error } = await supabase
-    .from("cronograma_de_treinos")
-    .select("id, id_do_usuario, dia_da_semana, id_do_treino, tempo, é_ativo")
-    .eq("dia_da_semana", weekday)
-    .eq("é_ativo", true);
+    .from("workout_schedule")
+    .select("id, user_id, weekday, workout_id, time, is_active")
+    .eq("weekday", weekday)
+    .eq("is_active", true);
 
   if (error) {
     throw new Error(`Erro ao buscar agenda de treino: ${error.message}`);
@@ -286,11 +286,11 @@ async function fetchTodayWorkoutEntries(referenceDate = new Date()) {
 
   return (data || []).map((row) => ({
     id: row.id,
-    user_id: row.id_do_usuario,
-    weekday: row.dia_da_semana,
-    workout_id: row.id_do_treino,
-    time: row.tempo,
-    is_active: row.é_ativo,
+    user_id: row.user_id,
+    weekday: row.weekday,
+    workout_id: row.workout_id,
+    time: row.time,
+    is_active: row.is_active,
   }));
 }
 

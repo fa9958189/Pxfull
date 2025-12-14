@@ -985,12 +985,44 @@ const WorkoutRoutine = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL, pushTo
         notify('Perfil do usuário não carregado.', 'warning');
         return;
       }
+
       const data = await fetchJson(`${apiBaseUrl}/workout-schedule?user_id=${userId}`);
-      if (Array.isArray(data)) {
-        setSchedule(defaultSchedule.map((slot, idx) => ({ ...slot, ...(data[idx] || {}) })));
-      } else if (Array.isArray(data?.items)) {
-        setSchedule(defaultSchedule.map((slot, idx) => ({ ...slot, ...(data.items[idx] || {}) })));
-      }
+
+      const rows = Array.isArray(data)
+        ? data
+        : Array.isArray(data?.items)
+          ? data.items
+          : [];
+
+      // cria um mapa por weekday pra não depender de índice
+      const byWeekday = new Map(
+        rows
+          .filter((r) => r && r.weekday)
+          .map((r) => [
+            Number(r.weekday),
+            {
+              ...r,
+              // padroniza o toggle no formato do front
+              reminder: r.is_active ?? r.isActive ?? true,
+            },
+          ])
+      );
+
+      const merged = defaultSchedule.map((slot, idx) => {
+        const weekday = Number(slot.weekday || slot.dayIndex || idx + 1);
+        const fromDb = byWeekday.get(weekday);
+
+        return {
+          ...slot,
+          weekday,
+          // traz do banco o que existir
+          workout_id: fromDb?.workout_id ?? slot.workout_id ?? null,
+          time: fromDb?.time ?? slot.time ?? null,
+          reminder: fromDb?.reminder ?? slot.reminder ?? true,
+        };
+      });
+
+      setSchedule(merged);
     } catch (err) {
       console.error('Erro ao carregar semana de treino', err);
       notify('Não foi possível carregar a semana de treino.');
@@ -1206,11 +1238,24 @@ const WorkoutRoutine = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL, pushTo
   const handleSaveSchedule = async () => {
     try {
       setSavingSchedule(true);
-      const payload = { schedule, userId, user_id: userId };
+
+      const normalizedSchedule = (Array.isArray(schedule) ? schedule : []).map((item, index) => {
+        const weekday = Number(item.weekday || item.dayIndex || index + 1);
+        return {
+          weekday,
+          workout_id: item.workout_id || item.workoutId || null,
+          time: item.time || null,
+          reminder: item.reminder !== undefined ? !!item.reminder : true,
+        };
+      });
+
+      const payload = { schedule: normalizedSchedule, userId, user_id: userId };
+
       await fetchJson(`${apiBaseUrl}/workout-schedule`, {
         method: 'POST',
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
       });
+
       notify('Semana de treino salva!', 'success');
     } catch (err) {
       console.warn('Erro ao salvar semana de treino', err);
