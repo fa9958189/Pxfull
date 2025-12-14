@@ -266,16 +266,34 @@ async function markWorkoutReminderSent(scheduleId, userId, dayStr) {
   }
 }
 
-const getCurrentWeekdayIndex = (referenceDate = new Date()) => {
-  const jsDay = referenceDate.getDay();
-  return jsDay === 0 ? 7 : jsDay; // 1=segunda, 7=domingo
+const getDbWeekday = (date = new Date()) => {
+  const js = date.getDay();
+  return js === 0 ? 7 : js;
+};
+
+const hhmmFromDate = (date = new Date()) => {
+  const hh = String(date.getHours()).padStart(2, "0");
+  const mm = String(date.getMinutes()).padStart(2, "0");
+  return `${hh}:${mm}`;
+};
+
+const normalizeTimeToHHMM = (t) => {
+  if (!t) return null;
+  return String(t).slice(0, 5);
+};
+
+const yyyyMmDd = (date = new Date()) => {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
 };
 
 async function fetchTodayWorkoutEntries(referenceDate = new Date()) {
-  const weekday = getCurrentWeekdayIndex(referenceDate);
+  const weekday = getDbWeekday(referenceDate);
 
   const { data, error } = await supabase
-    .from("workout_schedule")
+    .from("cronograma_de_treinos")
     .select("id, user_id, weekday, workout_id, time, is_active")
     .eq("weekday", weekday)
     .eq("is_active", true);
@@ -294,12 +312,25 @@ async function fetchTodayWorkoutEntries(referenceDate = new Date()) {
   }));
 }
 
-async function buildWorkoutRemindersForToday(now, dayStr, intervalMinutes) {
+async function buildWorkoutRemindersForToday(now, dayStr) {
+  const dbWeekday = getDbWeekday(now);
+  const nowHHMM = hhmmFromDate(now);
+
+  console.log(
+    `🔎 Checando lembretes de treino... weekday=${dbWeekday} hora=${nowHHMM}`
+  );
+
   const entries = await fetchTodayWorkoutEntries(now);
-  if (!entries.length) return [];
+  console.log(`📅 Registros ativos encontrados: ${entries.length}`);
+
+  const entriesAtTime = entries.filter(
+    (entry) => normalizeTimeToHHMM(entry.time) === nowHHMM
+  );
+
+  if (!entriesAtTime.length) return [];
 
   const workoutIds = Array.from(
-    new Set(entries.map((item) => item.workout_id).filter(Boolean))
+    new Set(entriesAtTime.map((item) => item.workout_id).filter(Boolean))
   );
 
   let workoutsMap = new Map();
@@ -316,7 +347,9 @@ async function buildWorkoutRemindersForToday(now, dayStr, intervalMinutes) {
     workoutsMap = new Map((workouts || []).map((item) => [item.id, item]));
   }
 
-  const userIds = Array.from(new Set(entries.map((item) => item.user_id).filter(Boolean)));
+  const userIds = Array.from(
+    new Set(entriesAtTime.map((item) => item.user_id).filter(Boolean))
+  );
   const { data: profiles, error: profileError } = await supabase
     .from("profiles")
     .select("id, name, whatsapp")
@@ -330,24 +363,23 @@ async function buildWorkoutRemindersForToday(now, dayStr, intervalMinutes) {
 
   const reminders = [];
 
-  for (const entry of entries) {
+  for (const entry of entriesAtTime) {
     const workout = workoutsMap.get(entry.workout_id);
     const profile = profilesMap.get(entry.user_id);
 
     if (!workout || !profile || !profile.whatsapp) continue;
 
-    const hm = parseHourMinute(entry.time);
-    if (!hm) continue;
-
-    const sendTime = new Date(now);
-    sendTime.setHours(hm.hour, hm.minute, 0, 0);
-
-    if (!isWithinWindow(now, sendTime, intervalMinutes)) continue;
-
     const alreadySent = await hasWorkoutReminderBeenSent(entry.id, dayStr);
-    if (alreadySent) continue;
+    if (alreadySent) {
+      console.log(
+        `⏭️ Lembrete já enviado hoje para schedule_id=${entry.id}, pulando.`
+      );
+      continue;
+    }
 
-    const timePart = entry.time ? ` às ${entry.time}` : "";
+    const timePart = normalizeTimeToHHMM(entry.time)
+      ? ` às ${normalizeTimeToHHMM(entry.time)}`
+      : "";
     const muscleGroups = (workout.muscle_groups || "")
       .split(",")
       .map((item) => item.trim())
@@ -369,19 +401,23 @@ async function buildWorkoutRemindersForToday(now, dayStr, intervalMinutes) {
   return reminders;
 }
 
-export async function checkWorkoutReminders(intervalMinutes = 15) {
+export async function checkWorkoutReminders() {
   const now = new Date();
-  const dayStr = now.toISOString().slice(0, 10);
+  const dayStr = yyyyMmDd(now);
 
-  const workoutReminders = await buildWorkoutRemindersForToday(
-    now,
-    dayStr,
-    intervalMinutes
-  );
+  const workoutReminders = await buildWorkoutRemindersForToday(now, dayStr);
 
   for (const reminder of workoutReminders) {
-    await sendWhatsappMessage(reminder);
-    await markWorkoutReminderSent(reminder.scheduleId, reminder.userId, dayStr);
+    console.log(
+      `📲 Enviando lembrete para user_id ${reminder.userId} (schedule ${reminder.scheduleId})...`
+    );
+    try {
+      await sendWhatsappMessage(reminder);
+      await markWorkoutReminderSent(reminder.scheduleId, reminder.userId, dayStr);
+      console.log("✅ Lembrete enviado com sucesso.");
+    } catch (err) {
+      console.error("❌ Erro ao enviar lembrete de treino:", err);
+    }
   }
 }
 
@@ -462,7 +498,7 @@ export function startWorkoutReminderWorker() {
     }
   })();
 
-  // e depois roda a cada 60 segundos
+  // e depois roda a cada 20 segundos
   setInterval(async () => {
     try {
       console.log("🔎 Checando lembretes de treino...");
@@ -470,7 +506,7 @@ export function startWorkoutReminderWorker() {
     } catch (err) {
       console.error("Erro no worker:", err?.message || err);
     }
-  }, 60 * 1000);
+  }, 20 * 1000);
 }
 
 // Se rodar direto: `node reminders.js`
