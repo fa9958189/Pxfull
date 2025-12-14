@@ -6,7 +6,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { supabase } from "./supabase.js";
 import {
-  sendZapiMessage,
+  sendWhatsAppMessage,
   startRemindersJob,
   startWorkoutReminderWorker,
 } from "./reminders.js";
@@ -38,7 +38,7 @@ app.get("/debug/zapi-test", async (req, res) => {
     const phone = req.query.phone;
     const message = req.query.message || "Teste Z-API: chegou!";
 
-    await sendZapiMessage({ phone, message });
+    await sendWhatsAppMessage({ phone, message });
 
     res.json({ ok: true });
   } catch (e) {

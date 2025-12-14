@@ -333,7 +333,7 @@ export async function startRemindersJob({ intervalMinutes = 15 } = {}) {
 
 const MINUTE_CACHE_TTL_MS = 70_000;
 
-export async function sendZapiMessage({ phone, message }) {
+export async function sendWhatsAppMessage({ phone, message }) {
   if (!phone) throw new Error("Telefone vazio");
 
   const url = `${ZAPI_BASE_URL}/instances/${ZAPI_INSTANCE_ID}/token/${ZAPI_TOKEN}/send-text`;
@@ -349,15 +349,35 @@ export async function sendZapiMessage({ phone, message }) {
 
   if (ZAPI_CLIENT_TOKEN) headers["Client-Token"] = ZAPI_CLIENT_TOKEN;
 
-  const resp = await fetch(url, {
-    method: "POST",
-    headers,
-    body: JSON.stringify(body),
-  });
+  console.log("📨 Enviando WhatsApp (Z-API):", { url, payload: body });
 
-  const text = await resp.text().catch(() => "");
-  return { ok: resp.ok, status: resp.status, body: text };
+  try {
+    const resp = await fetch(url, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body),
+    });
+
+    const text = await resp.text().catch(() => "");
+    const ok = resp.status === 200 || resp.status === 201;
+
+    console.log("📥 Resposta Z-API:", { status: resp.status, body: text });
+
+    if (!ok) {
+      console.error("❌ Z-API retornou status inesperado", {
+        status: resp.status,
+        body: text,
+      });
+    }
+
+    return { ok, status: resp.status, body: text };
+  } catch (err) {
+    console.error("❌ Erro na chamada Z-API:", err);
+    throw err;
+  }
 }
+
+export const sendZapiMessage = sendWhatsAppMessage;
 
 function getNowInSaoPaulo() {
   return new Date(new Date().toLocaleString("en-US", { timeZone: TZ }));
@@ -377,7 +397,15 @@ function formatTempo(value) {
   return String(value ?? "").slice(0, 5);
 }
 
-async function loadRemindersForNow(weekday) {
+function isSchemaCacheError(error) {
+  return (
+    error?.code === "PGST205" ||
+    /schema cache/i.test(error?.message || "") ||
+    /reload schema/i.test(error?.message || "")
+  );
+}
+
+async function loadRemindersFromSupabase(weekday) {
   const { data, error } = await supabase
     .from(WORKOUT_SCHEDULE_TABLE)
     .select("id_usuario, dia_da_semana, tempo, is_active")
@@ -386,6 +414,51 @@ async function loadRemindersForNow(weekday) {
 
   if (error) throw error;
   return data || [];
+}
+
+async function loadRemindersViaRest(weekday) {
+  const baseUrl = SUPABASE_URL?.replace(/\/$/, "");
+  const url = `${baseUrl}/rest/v1/${WORKOUT_SCHEDULE_TABLE}` +
+    `?select=id_usuario,dia_da_semana,tempo,is_active` +
+    `&dia_da_semana=eq.${weekday}&is_active=eq.true`;
+
+  const headers = {
+    apikey: SUPABASE_SERVICE_ROLE_KEY,
+    Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+    Accept: "application/json",
+  };
+
+  const resp = await fetch(url, { headers });
+  const text = await resp.text();
+  if (!resp.ok) {
+    throw new Error(
+      `REST fallback falhou (${resp.status}): ${text || "sem corpo"}`
+    );
+  }
+
+  try {
+    return JSON.parse(text);
+  } catch (err) {
+    throw new Error("REST fallback retornou JSON inválido");
+  }
+}
+
+async function loadRemindersForNow(weekday) {
+  try {
+    return await loadRemindersFromSupabase(weekday);
+  } catch (error) {
+    console.error("❌ Erro Supabase ao buscar cronograma:", error);
+
+    if (!isSchemaCacheError(error)) {
+      throw error;
+    }
+
+    console.warn(
+      "⚠️ Erro PGST205/schema cache detectado. Tentando fallback REST..."
+    );
+
+    return await loadRemindersViaRest(weekday);
+  }
 }
 
 async function getUserPhone(userId) {
@@ -412,7 +485,10 @@ export async function checkWorkoutRemindersOnce() {
     reminders = await loadRemindersForNow(weekday);
     console.log(`📋 Registros ativos encontrados hoje: ${reminders.length}`);
   } catch (error) {
-    console.error("❌ Erro ao buscar agenda de treino (Supabase):", error);
+    console.error("❌ Falha na busca da agenda de treino:", error);
+    console.error(
+      "ℹ️ Worker continuará rodando mesmo com erro na consulta do Supabase."
+    );
     return;
   }
 
@@ -446,12 +522,16 @@ export async function checkWorkoutRemindersOnce() {
 
     console.log("📤 Enviando WhatsApp via Z-API:", { phone, message });
 
-    const z = await sendZapiMessage({ phone, message });
+    try {
+      const z = await sendWhatsAppMessage({ phone, message });
 
-    if (!z.ok) {
-      console.error("❌ Z-API falhou:", { status: z.status, body: z.body });
-    } else {
-      console.log("✅ Z-API OK:", { status: z.status, body: z.body });
+      if (!z.ok) {
+        console.error("❌ Z-API falhou:", { status: z.status, body: z.body });
+      } else {
+        console.log("✅ Z-API OK:", { status: z.status, body: z.body });
+      }
+    } catch (err) {
+      console.error("❌ Erro ao enviar via Z-API:", err);
     }
   }
 
