@@ -27,6 +27,7 @@ app.use(express.json());
 
 // Inicia o job de lembretes (agenda + treinos)
 startRemindersJob({ intervalMinutes: 15 });
+startWorkoutReminderWorker();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
