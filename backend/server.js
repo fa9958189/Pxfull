@@ -5,7 +5,7 @@ import fs from "fs/promises";
 import path from "path";
 import { fileURLToPath } from "url";
 import { supabase } from "./supabase.js";
-import { startRemindersJob } from "./reminders.js";
+import { startRemindersJob, startWorkoutReminderWorker } from "./reminders.js";
 import { analyzeFoodImage } from "./ai/foodScanner.js";
 import {
   createWorkoutSession,
@@ -749,4 +749,5 @@ app.put("/api/food-diary/state", async (req, res) => {
 
 app.listen(3001, () => {
   console.log("Backend rodando na porta 3001");
+  startWorkoutReminderWorker();
 });
