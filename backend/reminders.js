@@ -129,11 +129,6 @@ const parseEventStartTime = (event) => {
   return getDateTimeAt(event.date, hour, minute);
 };
 
-const isWithinWindow = (now, target, windowMinutes) => {
-  const diff = now.getTime() - target.getTime();
-  return diff >= 0 && diff < windowMinutes * 60 * 1000;
-};
-
 const MORNING_SEND_HOUR = 6;
 const MORNING_SEND_MINUTE = 20;
 const EARLY_EVENT_LIMIT_HOUR = 9;
@@ -225,13 +220,59 @@ async function markReminderSent(eventId, reminderKey, dayStr) {
   }
 }
 
-const getCurrentWeekdayIndex = () => {
-  const jsDay = new Date().getDay();
+function parseHourMinute(timeValue) {
+  const str = String(timeValue || "").trim();
+  if (!str) return null;
+  const [hh, mm] = str.split(":");
+  const hour = Number(hh);
+  const minute = Number(mm);
+  if (Number.isNaN(hour) || Number.isNaN(minute)) return null;
+  return { hour, minute };
+}
+
+function isWithinWindow(now, target, windowMinutes) {
+  const diff = now.getTime() - target.getTime();
+  return diff >= 0 && diff < windowMinutes * 60 * 1000;
+}
+
+async function hasWorkoutReminderBeenSent(scheduleId, dayStr) {
+  const { data, error } = await supabase
+    .from("workout_reminder_logs")
+    .select("id")
+    .eq("schedule_id", scheduleId)
+    .eq("day", dayStr)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`Erro ao verificar log de treino: ${error.message}`);
+  }
+  return Boolean(data);
+}
+
+async function markWorkoutReminderSent(scheduleId, userId, dayStr) {
+  const payload = {
+    schedule_id: scheduleId,
+    user_id: userId,
+    day: dayStr,
+    sent_at: new Date().toISOString(),
+  };
+
+  const { error } = await supabase
+    .from("workout_reminder_logs")
+    .upsert(payload, { onConflict: "schedule_id,day" });
+
+  if (error) {
+    throw new Error(`Erro ao registrar log de treino: ${error.message}`);
+  }
+}
+
+const getCurrentWeekdayIndex = (referenceDate = new Date()) => {
+  const jsDay = referenceDate.getDay();
   return jsDay === 0 ? 7 : jsDay; // 1=segunda, 7=domingo
 };
 
-async function fetchTodayWorkoutEntries() {
-  const weekday = getCurrentWeekdayIndex();
+async function fetchTodayWorkoutEntries(referenceDate = new Date()) {
+  const weekday = getCurrentWeekdayIndex(referenceDate);
 
   const { data, error } = await supabase
     .from("workout_schedule")
@@ -246,8 +287,8 @@ async function fetchTodayWorkoutEntries() {
   return data || [];
 }
 
-async function buildWorkoutRemindersForToday() {
-  const entries = await fetchTodayWorkoutEntries();
+async function buildWorkoutRemindersForToday(now, dayStr, intervalMinutes) {
+  const entries = await fetchTodayWorkoutEntries(now);
   if (!entries.length) return [];
 
   const workoutIds = Array.from(
@@ -280,27 +321,45 @@ async function buildWorkoutRemindersForToday() {
 
   const profilesMap = new Map((profiles || []).map((item) => [item.id, item]));
 
-  return entries
-    .map((entry) => {
-      const workout = workoutsMap.get(entry.workout_id);
-      const profile = profilesMap.get(entry.user_id);
+  const reminders = [];
 
-      if (!workout || !profile || !profile.whatsapp) return null;
+  for (const entry of entries) {
+    const workout = workoutsMap.get(entry.workout_id);
+    const profile = profilesMap.get(entry.user_id);
 
-      const timePart = entry.time ? ` às ${entry.time}` : "";
-      const muscleGroups = (workout.muscle_groups || "")
-        .split(",")
-        .map((item) => item.trim())
-        .filter(Boolean)
-        .join(", ") || "-";
+    if (!workout || !profile || !profile.whatsapp) continue;
 
-      const message =
-        `Bom dia, ${profile.name || ""}! Hoje é dia de ${workout.name}${timePart}. ` +
-        `Grupos musculares: ${muscleGroups}. Bora treinar! 💪`;
+    const hm = parseHourMinute(entry.time);
+    if (!hm) continue;
 
-      return { to: profile.whatsapp, message };
-    })
-    .filter(Boolean);
+    const sendTime = new Date(now);
+    sendTime.setHours(hm.hour, hm.minute, 0, 0);
+
+    if (!isWithinWindow(now, sendTime, intervalMinutes)) continue;
+
+    const alreadySent = await hasWorkoutReminderBeenSent(entry.id, dayStr);
+    if (alreadySent) continue;
+
+    const timePart = entry.time ? ` às ${entry.time}` : "";
+    const muscleGroups = (workout.muscle_groups || "")
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean)
+      .join(", ") || "-";
+
+    const message =
+      `Bom dia, ${profile.name || ""}! Hoje é dia de ${workout.name}${timePart}. ` +
+      `Grupos musculares: ${muscleGroups}. Bora treinar! 💪`;
+
+    reminders.push({
+      to: profile.whatsapp,
+      message,
+      scheduleId: entry.id,
+      userId: entry.user_id,
+    });
+  }
+
+  return reminders;
 }
 
 /**
@@ -348,9 +407,18 @@ export function startRemindersJob({ intervalMinutes = 15 } = {}) {
       }
 
       try {
-        const workoutReminders = await buildWorkoutRemindersForToday();
+        const workoutReminders = await buildWorkoutRemindersForToday(
+          now,
+          dayStr,
+          intervalMinutes
+        );
         for (const reminder of workoutReminders) {
           await sendWhatsappMessage(reminder);
+          await markWorkoutReminderSent(
+            reminder.scheduleId,
+            reminder.userId,
+            dayStr
+          );
         }
       } catch (workoutErr) {
         console.error("Erro ao enviar lembretes de treino:", workoutErr.message);
