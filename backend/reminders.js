@@ -27,6 +27,231 @@ const ZAPI_BASE_URL = process.env.ZAPI_BASE_URL || "https://api.z-api.io";
 
 const TZ = "America/Sao_Paulo";
 
+let reminderTableEnsured = false;
+
+async function ensureEventReminderTable() {
+  if (reminderTableEnsured) return true;
+
+  const baseUrl = SUPABASE_URL?.replace(/\/$/, "");
+  const sql = `create table if not exists public.event_reminder_sends (
+    id uuid primary key default gen_random_uuid(),
+    event_id uuid not null references public.events(id) on delete cascade,
+    user_id uuid not null,
+    scheduled_at timestamptz not null,
+    sent_at timestamptz not null default now()
+  );`;
+
+  if (!baseUrl || !SUPABASE_SERVICE_ROLE_KEY) {
+    console.error("❌ Não foi possível garantir a tabela event_reminder_sends (config ausente)");
+    return false;
+  }
+
+  try {
+    const resp = await fetch(`${baseUrl}/rest/v1/rpc/execute_sql`, {
+      method: "POST",
+      headers: {
+        apikey: SUPABASE_SERVICE_ROLE_KEY,
+        Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ sql }),
+    });
+
+    if (!resp.ok) {
+      const text = await resp.text();
+      console.error(
+        "❌ Falha ao garantir tabela event_reminder_sends:",
+        resp.status,
+        text
+      );
+      return false;
+    }
+
+    reminderTableEnsured = true;
+    return true;
+  } catch (err) {
+    console.error("❌ Erro ao criar tabela event_reminder_sends:", err);
+    return false;
+  }
+}
+
+function getNowInSaoPaulo() {
+  return new Date(new Date().toLocaleString("en-US", { timeZone: TZ }));
+}
+
+function formatDateOnlyInSaoPaulo(date) {
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: TZ,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  return formatter.format(date);
+}
+
+function normalizePhone(raw) {
+  return String(raw || "")
+    .replace(/[+\s()-]/g, "")
+    .trim();
+}
+
+function toSaoPauloDate(dateStr, timeStr) {
+  const [year, month, day] = (dateStr || "").split("-").map(Number);
+  const [hour, minute] = (timeStr || "0:0").split(":").map(Number);
+  if (
+    [year, month, day, hour, minute].some((value) =>
+      Number.isNaN(Number(value))
+    )
+  ) {
+    return null;
+  }
+
+  const utcGuess = new Date(Date.UTC(year, month - 1, day, hour, minute));
+  const localInTz = new Date(
+    utcGuess.toLocaleString("en-US", { timeZone: TZ })
+  );
+  const offsetMinutes = (localInTz.getTime() - utcGuess.getTime()) / 60000;
+  return new Date(utcGuess.getTime() - offsetMinutes * 60 * 1000);
+}
+
+async function hasEventReminderBeenSent(eventId) {
+  const { data, error } = await supabase
+    .from("event_reminder_sends")
+    .select("id")
+    .eq("event_id", eventId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`Erro ao verificar envio do lembrete: ${error.message}`);
+  }
+
+  return Boolean(data);
+}
+
+async function markEventReminderSent(eventId, userId, scheduledAt) {
+  const payload = {
+    event_id: eventId,
+    user_id: userId,
+    scheduled_at: scheduledAt.toISOString(),
+  };
+
+  const { error } = await supabase
+    .from("event_reminder_sends")
+    .insert(payload);
+
+  if (error) {
+    throw new Error(`Erro ao registrar envio de lembrete: ${error.message}`);
+  }
+}
+
+async function fetchTodaysEvents(todayStr) {
+  const { data, error } = await supabase
+    .from("events")
+    .select("id, user_id, title, date, start, notes")
+    .eq("date", todayStr);
+
+  if (error) {
+    throw new Error(`Erro ao buscar eventos do dia: ${error.message}`);
+  }
+
+  return data || [];
+}
+
+function buildEventReminderMessage(event) {
+  const lines = [
+    "📅 Lembrete de agenda",
+    "",
+    `Título: ${event.title || "Evento"}`,
+    `Horário: ${event.start || "-"}`,
+  ];
+
+  if (event.notes) {
+    lines.push("", event.notes);
+  }
+
+  return lines.join("\n");
+}
+
+export async function checkEventReminders() {
+  try {
+    const tableReady = await ensureEventReminderTable();
+    if (!tableReady) return;
+
+    const now = getNowInSaoPaulo();
+    const todayStr = formatDateOnlyInSaoPaulo(now);
+
+    console.log(`🕒 Verificando eventos do dia ${todayStr}`);
+
+    const events = await fetchTodaysEvents(todayStr);
+
+    for (const event of events) {
+      if (!event.user_id || !event.start) continue;
+
+      console.log(`📌 Evento encontrado: ${event.title} às ${event.start}`);
+
+      const eventDate = toSaoPauloDate(event.date, event.start);
+      if (!eventDate) continue;
+
+      const nowTs = now.getTime();
+      const eventTs = eventDate.getTime();
+      const diff = nowTs - eventTs;
+
+      if (diff < 0 || diff > 59_000) {
+        continue;
+      }
+
+      try {
+        const alreadySent = await hasEventReminderBeenSent(event.id);
+        if (alreadySent) {
+          console.log("⏭️ Evento já notificado, ignorando");
+          continue;
+        }
+
+        const whatsapp = await fetchUserWhatsapp(event.user_id);
+        const phone = normalizePhone(whatsapp);
+
+        if (!phone) {
+          console.warn("⚠️ Usuário sem telefone válido, ignorando evento", event.id);
+          continue;
+        }
+
+        const message = buildEventReminderMessage(event);
+
+        console.log(`📤 Enviando WhatsApp para ${phone}`);
+        await sendWhatsappMessage({ to: phone, message });
+
+        await markEventReminderSent(event.id, event.user_id, eventDate);
+
+        console.log("✅ Lembrete enviado");
+      } catch (err) {
+        console.error("❌ Erro ao processar evento:", err.message || err);
+      }
+    }
+  } catch (err) {
+    console.error("❌ Erro no worker de eventos:", err.message || err);
+  }
+}
+
+let eventReminderIntervalId = null;
+
+export function startEventReminderWorker() {
+  if (eventReminderIntervalId) return eventReminderIntervalId;
+
+  console.log("🟢 Worker de lembretes de agenda iniciado");
+
+  checkEventReminders().catch((err) =>
+    console.error("❌ Erro inicial no worker de eventos:", err)
+  );
+
+  eventReminderIntervalId = setInterval(() => {
+    checkEventReminders().catch((err) =>
+      console.error("❌ Erro no ciclo do worker de eventos:", err)
+    );
+  }, 20_000);
+
+  return eventReminderIntervalId;
+}
+
 const sentInMinute = new Set();
 function makeKey(userId, weekday, hhmm) {
   return `${userId}|${weekday}|${hhmm}`;
@@ -379,10 +604,6 @@ export async function sendWhatsAppMessage({ phone, message }) {
 
 export const sendZapiMessage = sendWhatsAppMessage;
 
-function getNowInSaoPaulo() {
-  return new Date(new Date().toLocaleString("en-US", { timeZone: TZ }));
-}
-
 function getWeekday(now) {
   return now.getDay();
 }
@@ -564,6 +785,5 @@ export function startWorkoutReminderWorker() {
 }
 
 if (process.argv[1] && process.argv[1].endsWith("reminders.js")) {
-  startRemindersJob();
-  startWorkoutReminderWorker();
+  startEventReminderWorker();
 }

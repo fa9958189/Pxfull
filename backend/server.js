@@ -7,8 +7,7 @@ import { fileURLToPath } from "url";
 import { supabase } from "./supabase.js";
 import {
   sendWhatsAppMessage,
-  startRemindersJob,
-  startWorkoutReminderWorker,
+  startEventReminderWorker,
 } from "./reminders.js";
 import { analyzeFoodImage } from "./ai/foodScanner.js";
 import {
@@ -29,9 +28,8 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Inicia o job de lembretes (agenda + treinos)
-startRemindersJob({ intervalMinutes: 15 });
-startWorkoutReminderWorker();
+// Inicia o job de lembretes (agenda)
+startEventReminderWorker();
 
 app.get("/debug/zapi-test", async (req, res) => {
   try {
