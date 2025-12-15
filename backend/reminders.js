@@ -9,8 +9,7 @@ const SUPABASE_SERVICE_ROLE_KEY =
   process.env.SUPABASE_KEY ||
   process.env.SUPABASE_ANON_KEY;
 
-const WORKOUT_SCHEDULE_TABLE =
-  process.env.WORKOUT_SCHEDULE_TABLE || "cronograma_de_treinos";
+const WORKOUT_SCHEDULE_TABLE = process.env.WORKOUT_SCHEDULE_TABLE || "events";
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
   auth: { persistSession: false },
@@ -253,8 +252,8 @@ export function startEventReminderWorker() {
 }
 
 const sentInMinute = new Set();
-function makeKey(userId, weekday, hhmm) {
-  return `${userId}|${weekday}|${hhmm}`;
+function makeKey(userId, dateStr, hhmm) {
+  return `${userId}|${dateStr}|${hhmm}`;
 }
 
 function logSupabaseInfo() {
@@ -322,39 +321,7 @@ export async function fetchUserWhatsapp(userId) {
  * @returns {Promise<any>}
  */
 export async function sendWhatsappMessage({ to, message }) {
-  if (!WHATSAPP_API_URL || !WHATSAPP_API_TOKEN) {
-    throw new Error(
-      "Configure WHATSAPP_API_URL e WHATSAPP_API_TOKEN para enviar mensagens."
-    );
-  }
-
-  const phone = String(to || "").replace(/\D/g, "");
-  if (!phone) {
-    throw new Error("Número de WhatsApp inválido para envio.");
-  }
-
-  const response = await fetch(WHATSAPP_API_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Client-Token": WHATSAPP_API_TOKEN,
-    },
-    body: JSON.stringify({
-      phone,
-      message,
-    }),
-  });
-
-  if (!response.ok) {
-    const body = await response.text();
-    throw new Error(`Falha ao enviar mensagem (${response.status}): ${body}`);
-  }
-
-  try {
-    return await response.json();
-  } catch (err) {
-    return null;
-  }
+  return sendWhatsAppMessage({ phone: to, message });
 }
 
 const buildReminderMessage = (event, type) => {
@@ -559,12 +526,21 @@ export async function startRemindersJob({ intervalMinutes = 15 } = {}) {
 const MINUTE_CACHE_TTL_MS = 70_000;
 
 export async function sendWhatsAppMessage({ phone, message }) {
-  if (!phone) throw new Error("Telefone vazio");
+  const sanitizedPhone = String(phone || "").replace(/\D/g, "");
+  if (!sanitizedPhone) throw new Error("Telefone vazio");
 
-  const url = `${ZAPI_BASE_URL}/instances/${ZAPI_INSTANCE_ID}/token/${ZAPI_TOKEN}/send-text`;
+  const url =
+    WHATSAPP_API_URL ||
+    (ZAPI_INSTANCE_ID && ZAPI_TOKEN
+      ? `${ZAPI_BASE_URL}/instances/${ZAPI_INSTANCE_ID}/token/${ZAPI_TOKEN}/send-text`
+      : null);
+
+  if (!url) {
+    throw new Error("URL da API de WhatsApp não configurada");
+  }
 
   const body = {
-    phone,
+    phone: sanitizedPhone,
     message,
   };
 
@@ -572,9 +548,14 @@ export async function sendWhatsAppMessage({ phone, message }) {
     "Content-Type": "application/json",
   };
 
+  if (WHATSAPP_API_TOKEN) {
+    headers.Authorization = `Bearer ${WHATSAPP_API_TOKEN}`;
+  }
+
   if (ZAPI_CLIENT_TOKEN) headers["Client-Token"] = ZAPI_CLIENT_TOKEN;
 
-  console.log("📨 Enviando WhatsApp (Z-API):", { url, payload: body });
+  const maskedPhone = sanitizedPhone.replace(/.(?=.{4})/g, "*");
+  console.log("📨 Enviando WhatsApp (Z-API) para", maskedPhone);
 
   try {
     const resp = await fetch(url, {
@@ -586,7 +567,7 @@ export async function sendWhatsAppMessage({ phone, message }) {
     const text = await resp.text().catch(() => "");
     const ok = resp.status === 200 || resp.status === 201;
 
-    console.log("📥 Resposta Z-API:", { status: resp.status, body: text });
+    console.log("📥 Resposta Z-API: status", resp.status);
 
     if (!ok) {
       console.error("❌ Z-API retornou status inesperado", {
@@ -603,10 +584,6 @@ export async function sendWhatsAppMessage({ phone, message }) {
 }
 
 export const sendZapiMessage = sendWhatsAppMessage;
-
-function getWeekday(now) {
-  return now.getDay();
-}
 
 function formatHHMM(now) {
   const hours = String(now.getHours()).padStart(2, "0");
@@ -626,22 +603,21 @@ function isSchemaCacheError(error) {
   );
 }
 
-async function loadRemindersFromSupabase(weekday) {
+async function loadRemindersFromSupabase(todayStr) {
   const { data, error } = await supabase
     .from(WORKOUT_SCHEDULE_TABLE)
-    .select("id_usuario, dia_da_semana, tempo, is_active")
-    .eq("dia_da_semana", weekday)
-    .eq("is_active", true);
+    .select("id, user_id, start, title")
+    .eq("date", todayStr);
 
   if (error) throw error;
   return data || [];
 }
 
-async function loadRemindersViaRest(weekday) {
+async function loadRemindersViaRest(todayStr) {
   const baseUrl = SUPABASE_URL?.replace(/\/$/, "");
   const url = `${baseUrl}/rest/v1/${WORKOUT_SCHEDULE_TABLE}` +
-    `?select=id_usuario,dia_da_semana,tempo,is_active` +
-    `&dia_da_semana=eq.${weekday}&is_active=eq.true`;
+    `?select=id,user_id,start,title` +
+    `&date=eq.${todayStr}`;
 
   const headers = {
     apikey: SUPABASE_SERVICE_ROLE_KEY,
@@ -664,9 +640,9 @@ async function loadRemindersViaRest(weekday) {
   }
 }
 
-async function loadRemindersForNow(weekday) {
+async function loadRemindersForNow(todayStr) {
   try {
-    return await loadRemindersFromSupabase(weekday);
+    return await loadRemindersFromSupabase(todayStr);
   } catch (error) {
     console.error("❌ Erro Supabase ao buscar cronograma:", error);
 
@@ -678,7 +654,7 @@ async function loadRemindersForNow(weekday) {
       "⚠️ Erro PGST205/schema cache detectado. Tentando fallback REST..."
     );
 
-    return await loadRemindersViaRest(weekday);
+    return await loadRemindersViaRest(todayStr);
   }
 }
 
@@ -695,16 +671,16 @@ async function getUserPhone(userId) {
 
 export async function checkWorkoutRemindersOnce() {
   const now = getNowInSaoPaulo();
-  const weekday = getWeekday(now);
   const hhmm = formatHHMM(now);
+  const todayStr = formatDateOnlyInSaoPaulo(now);
 
-  console.log(`⏱ Checando lembretes... weekday=${weekday} hora=${hhmm}`);
+  console.log(`⏱ Checando lembretes... data=${todayStr} hora=${hhmm}`);
 
   let reminders = [];
 
   try {
-    reminders = await loadRemindersForNow(weekday);
-    console.log(`📋 Registros ativos encontrados hoje: ${reminders.length}`);
+    reminders = await loadRemindersForNow(todayStr);
+    console.log(`📋 Eventos encontrados hoje: ${reminders.length}`);
   } catch (error) {
     console.error("❌ Falha na busca da agenda de treino:", error);
     console.error(
@@ -714,10 +690,10 @@ export async function checkWorkoutRemindersOnce() {
   }
 
   for (const reminder of reminders) {
-    const tempo = formatTempo(reminder.tempo);
+    const tempo = formatTempo(reminder.start);
     if (!tempo || tempo !== hhmm) continue;
 
-    const key = makeKey(reminder.id_usuario, weekday, hhmm);
+    const key = makeKey(reminder.user_id, todayStr, hhmm);
     if (sentInMinute.has(key)) {
       console.log("⏭️ Ignorando duplicado (anti-spam):", key);
       continue;
@@ -728,20 +704,20 @@ export async function checkWorkoutRemindersOnce() {
 
     let phone;
     try {
-      phone = await getUserPhone(reminder.id_usuario);
+      phone = await getUserPhone(reminder.user_id);
     } catch (err) {
       console.error("❌ Erro buscando telefone do usuário:", err);
       continue;
     }
 
     if (!phone) {
-      console.warn("⚠️ Usuário sem telefone cadastrado. user_id=", reminder.id_usuario);
+      console.warn("⚠️ Usuário sem telefone cadastrado. user_id=", reminder.user_id);
       continue;
     }
 
-    const message = `📌 Lembrete: seu treino está marcado para agora (${hhmm}). Bora! 💪`;
-
-    console.log("📤 Enviando WhatsApp via Z-API:", { phone, message });
+    const message = reminder.title
+      ? `📌 Lembrete: "${reminder.title}" está marcado para agora (${hhmm}).`
+      : `📌 Lembrete: seu treino está marcado para agora (${hhmm}). Bora! 💪`;
 
     try {
       const z = await sendWhatsAppMessage({ phone, message });
@@ -779,7 +755,7 @@ export function startWorkoutReminderWorker() {
     checkWorkoutRemindersOnce().catch((e) =>
       console.error("❌ Erro no worker:", e)
     );
-  }, 10_000);
+  }, 30_000);
 
   return workoutWorkerIntervalId;
 }

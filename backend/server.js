@@ -8,6 +8,7 @@ import { supabase } from "./supabase.js";
 import {
   sendWhatsAppMessage,
   startEventReminderWorker,
+  startWorkoutReminderWorker,
 } from "./reminders.js";
 import { analyzeFoodImage } from "./ai/foodScanner.js";
 import {
@@ -39,6 +40,23 @@ app.get("/debug/zapi-test", async (req, res) => {
     await sendWhatsAppMessage({ phone, message });
 
     res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+app.post("/debug/send-whatsapp", async (req, res) => {
+  try {
+    const phone = req.body?.phone;
+    const message = req.body?.message || "Teste Z-API: chegou!";
+
+    const result = await sendWhatsAppMessage({ phone, message });
+
+    res.json({
+      ok: true,
+      status: result?.status ?? null,
+      body: result?.body ?? null,
+    });
   } catch (e) {
     res.status(500).json({ ok: false, error: e.message });
   }
