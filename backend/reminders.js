@@ -27,6 +27,8 @@ const ZAPI_BASE_URL = process.env.ZAPI_BASE_URL || "https://api.z-api.io";
 const TZ = "America/Sao_Paulo";
 
 const REMINDER_PROVIDER = "z-api";
+const REMINDER_INTERVAL_MINUTES =
+  Number(process.env.REMINDER_INTERVAL_MINUTES) || 15;
 
 function getNowInSaoPaulo() {
   return new Date(new Date().toLocaleString("en-US", { timeZone: TZ }));
@@ -46,12 +48,15 @@ function normalizePhone(raw) {
   const digits = String(raw || "").replace(/\D/g, "").trim();
   if (!digits) return "";
 
-  const withoutZeros = digits.replace(/^0+/, "");
-  const withCountry = withoutZeros.startsWith("55")
-    ? withoutZeros
-    : `55${withoutZeros}`;
+  if (digits.length === 10 || digits.length === 11) {
+    return `55${digits}`;
+  }
 
-  return withCountry.length >= 12 ? withCountry : "";
+  if (digits.startsWith("55") && digits.length >= 12 && digits.length <= 13) {
+    return digits;
+  }
+
+  return "";
 }
 
 function toSaoPauloDate(dateStr, timeStr) {
@@ -176,17 +181,14 @@ export async function checkEventReminders() {
         const phone = normalizePhone(whatsapp);
 
         if (!phone) {
-          const errorMessage = "Telefone não encontrado para o usuário";
+          const errorMessage = "Telefone inválido para o usuário";
           await logEventReminder({
             eventId: event.id,
             userId: event.user_id,
             status: "error",
             error: errorMessage,
           });
-          console.warn(
-            "⚠️ Usuário sem telefone válido, ignorando evento",
-            event.id
-          );
+          console.error("⚠️ Usuário sem telefone válido, ignorando evento");
           continue;
         }
 
@@ -249,7 +251,7 @@ export function startEventReminderWorker() {
     checkEventReminders().catch((err) =>
       console.error("❌ Erro no ciclo do worker de eventos:", err)
     );
-  }, 20_000);
+  }, REMINDER_INTERVAL_MINUTES * 60 * 1000);
 
   return eventReminderIntervalId;
 }
@@ -438,10 +440,11 @@ const shouldSendReminder = (event, now, intervalMinutes) => {
 
 const getReminderKey = (event, reminderType) => `${event.id}-${reminderType}`;
 
-async function hasReminderBeenSent(eventId, reminderKey, dayStr) {
+async function hasReminderBeenSent(userId, eventId, reminderKey, dayStr) {
   const { data, error } = await supabase
     .from("event_reminder_logs")
     .select("id")
+    .eq("user_id", userId)
     .eq("event_id", eventId)
     .eq("reminder_key", reminderKey)
     .eq("day", dayStr)
@@ -454,8 +457,9 @@ async function hasReminderBeenSent(eventId, reminderKey, dayStr) {
   return Boolean(data);
 }
 
-async function markReminderSent(eventId, reminderKey, dayStr) {
+async function markReminderSent(userId, eventId, reminderKey, dayStr) {
   const payload = {
+    user_id: userId,
     event_id: eventId,
     reminder_key: reminderKey,
     day: dayStr,
@@ -464,7 +468,7 @@ async function markReminderSent(eventId, reminderKey, dayStr) {
 
   const { error } = await supabase
     .from("event_reminder_logs")
-    .upsert(payload, { onConflict: "event_id,day,reminder_key" });
+    .upsert(payload, { onConflict: "user_id,event_id,day,reminder_key" });
 
   if (error) {
     throw new Error(`Erro ao registrar lembrete enviado: ${error.message}`);
@@ -486,7 +490,9 @@ function isWithinWindow(now, target, windowMinutes) {
   return diff >= 0 && diff < windowMinutes * 60 * 1000;
 }
 
-export async function startRemindersJob({ intervalMinutes = 15 } = {}) {
+export async function startRemindersJob({
+  intervalMinutes = REMINDER_INTERVAL_MINUTES,
+} = {}) {
   let isRunning = false;
 
   const tick = async () => {
@@ -511,19 +517,28 @@ export async function startRemindersJob({ intervalMinutes = 15 } = {}) {
         if (!shouldSend || !reminderType) continue;
 
         const reminderKey = getReminderKey(event, reminderType);
-        const alreadySent = await hasReminderBeenSent(event.id, reminderKey, dayStr);
+        const alreadySent = await hasReminderBeenSent(
+          event.user_id,
+          event.id,
+          reminderKey,
+          dayStr
+        );
         if (alreadySent) continue;
 
         const whatsapp = await fetchUserWhatsapp(event.user_id);
-        if (!whatsapp) continue;
+        const phone = normalizePhone(whatsapp);
+        if (!phone) {
+          console.error("⚠️ Telefone inválido, lembrete não enviado");
+          continue;
+        }
 
         const message = buildReminderMessage(
           event,
           reminderType === "day_before" ? "day_before" : "day_of"
         );
 
-        await sendWhatsappMessage({ to: whatsapp, message });
-        await markReminderSent(event.id, reminderKey, dayStr);
+        await sendWhatsappMessage({ to: phone, message });
+        await markReminderSent(event.user_id, event.id, reminderKey, dayStr);
       }
     } catch (err) {
       console.error("Erro no job de lembretes:", err.message);
