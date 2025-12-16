@@ -26,53 +26,7 @@ const ZAPI_BASE_URL = process.env.ZAPI_BASE_URL || "https://api.z-api.io";
 
 const TZ = "America/Sao_Paulo";
 
-let reminderTableEnsured = false;
-
-async function ensureEventReminderTable() {
-  if (reminderTableEnsured) return true;
-
-  const baseUrl = SUPABASE_URL?.replace(/\/$/, "");
-  const sql = `create table if not exists public.event_reminder_sends (
-    id uuid primary key default gen_random_uuid(),
-    event_id uuid not null references public.events(id) on delete cascade,
-    user_id uuid not null,
-    scheduled_at timestamptz not null,
-    sent_at timestamptz not null default now()
-  );`;
-
-  if (!baseUrl || !SUPABASE_SERVICE_ROLE_KEY) {
-    console.error("❌ Não foi possível garantir a tabela event_reminder_sends (config ausente)");
-    return false;
-  }
-
-  try {
-    const resp = await fetch(`${baseUrl}/rest/v1/rpc/execute_sql`, {
-      method: "POST",
-      headers: {
-        apikey: SUPABASE_SERVICE_ROLE_KEY,
-        Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ sql }),
-    });
-
-    if (!resp.ok) {
-      const text = await resp.text();
-      console.error(
-        "❌ Falha ao garantir tabela event_reminder_sends:",
-        resp.status,
-        text
-      );
-      return false;
-    }
-
-    reminderTableEnsured = true;
-    return true;
-  } catch (err) {
-    console.error("❌ Erro ao criar tabela event_reminder_sends:", err);
-    return false;
-  }
-}
+const REMINDER_PROVIDER = "z-api";
 
 function getNowInSaoPaulo() {
   return new Date(new Date().toLocaleString("en-US", { timeZone: TZ }));
@@ -89,9 +43,15 @@ function formatDateOnlyInSaoPaulo(date) {
 }
 
 function normalizePhone(raw) {
-  return String(raw || "")
-    .replace(/[+\s()-]/g, "")
-    .trim();
+  const digits = String(raw || "").replace(/\D/g, "").trim();
+  if (!digits) return "";
+
+  const withoutZeros = digits.replace(/^0+/, "");
+  const withCountry = withoutZeros.startsWith("55")
+    ? withoutZeros
+    : `55${withoutZeros}`;
+
+  return withCountry.length >= 12 ? withCountry : "";
 }
 
 function toSaoPauloDate(dateStr, timeStr) {
@@ -115,9 +75,10 @@ function toSaoPauloDate(dateStr, timeStr) {
 
 async function hasEventReminderBeenSent(eventId) {
   const { data, error } = await supabase
-    .from("event_reminder_sends")
+    .from("event_reminder_logs")
     .select("id")
     .eq("event_id", eventId)
+    .eq("status", "success")
     .maybeSingle();
 
   if (error) {
@@ -127,19 +88,27 @@ async function hasEventReminderBeenSent(eventId) {
   return Boolean(data);
 }
 
-async function markEventReminderSent(eventId, userId, scheduledAt) {
+async function logEventReminder({
+  eventId,
+  userId,
+  providerMessageId = null,
+  status,
+  error: errorMessage = null,
+}) {
   const payload = {
     event_id: eventId,
     user_id: userId,
-    scheduled_at: scheduledAt.toISOString(),
+    sent_at: new Date().toISOString(),
+    provider: REMINDER_PROVIDER,
+    provider_message_id: providerMessageId,
+    status,
+    error: errorMessage,
   };
 
-  const { error } = await supabase
-    .from("event_reminder_sends")
-    .insert(payload);
+  const { error } = await supabase.from("event_reminder_logs").insert(payload);
 
   if (error) {
-    throw new Error(`Erro ao registrar envio de lembrete: ${error.message}`);
+    throw new Error(`Erro ao registrar log de lembrete: ${error.message}`);
   }
 }
 
@@ -173,9 +142,6 @@ function buildEventReminderMessage(event) {
 
 export async function checkEventReminders() {
   try {
-    const tableReady = await ensureEventReminderTable();
-    if (!tableReady) return;
-
     const now = getNowInSaoPaulo();
     const todayStr = formatDateOnlyInSaoPaulo(now);
 
@@ -210,20 +176,57 @@ export async function checkEventReminders() {
         const phone = normalizePhone(whatsapp);
 
         if (!phone) {
-          console.warn("⚠️ Usuário sem telefone válido, ignorando evento", event.id);
+          const errorMessage = "Telefone não encontrado para o usuário";
+          await logEventReminder({
+            eventId: event.id,
+            userId: event.user_id,
+            status: "error",
+            error: errorMessage,
+          });
+          console.warn(
+            "⚠️ Usuário sem telefone válido, ignorando evento",
+            event.id
+          );
           continue;
         }
 
         const message = buildEventReminderMessage(event);
 
-        console.log(`📤 Enviando WhatsApp para ${phone}`);
-        await sendWhatsappMessage({ to: phone, message });
+        const maskedPhone = phone.replace(/.(?=.{4})/g, "*");
+        console.log(`📤 Enviando WhatsApp para ${maskedPhone}`);
+        const sendResult = await sendWhatsappMessage({ to: phone, message });
 
-        await markEventReminderSent(event.id, event.user_id, eventDate);
+        if (!sendResult?.ok) {
+          const errorMessage = `Envio via Z-API retornou status ${sendResult?.status}`;
+          await logEventReminder({
+            eventId: event.id,
+            userId: event.user_id,
+            status: "error",
+            error: errorMessage,
+          });
+          console.error("❌ Falha ao enviar lembrete:", errorMessage);
+          continue;
+        }
 
-        console.log("✅ Lembrete enviado");
+        await logEventReminder({
+          eventId: event.id,
+          userId: event.user_id,
+          status: "success",
+        });
+
+        console.log("✅ Lembrete enviado e registrado");
       } catch (err) {
         console.error("❌ Erro ao processar evento:", err.message || err);
+        try {
+          await logEventReminder({
+            eventId: event.id,
+            userId: event.user_id,
+            status: "error",
+            error: err.message || String(err),
+          });
+        } catch (logError) {
+          console.error("❌ Falha ao registrar erro de lembrete:", logError);
+        }
       }
     }
   } catch (err) {
@@ -257,14 +260,6 @@ function makeKey(userId, dateStr, hhmm) {
 }
 
 function logSupabaseInfo() {
-  const rawUrl =
-    process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || SUPABASE_URL;
-  const urlHost = (rawUrl || "")
-    .replace("https://", "")
-    .replace("http://", "")
-    .split("/")[0];
-
-  console.log("SUPABASE_URL host:", urlHost || "(vazio)");
   console.log("🔎 Tabela agenda:", WORKOUT_SCHEDULE_TABLE);
 }
 
@@ -295,6 +290,14 @@ export async function fetchUpcomingEvents() {
   return data || [];
 }
 
+function isMissingColumnError(error, columnName) {
+  const message = error?.message || "";
+  return (
+    error?.code === "42703" ||
+    new RegExp(`column .*${columnName}.* does not exist`, "i").test(message)
+  );
+}
+
 /**
  * Busca o WhatsApp do usuário na tabela profiles.
  * Aqui usamos o userId que vem do campo user_id da tabela events.
@@ -302,17 +305,33 @@ export async function fetchUpcomingEvents() {
  * @returns {Promise<string|null>}
  */
 export async function fetchUserWhatsapp(userId) {
-  const { data, error } = await supabase
+  const primary = await supabase
     .from("profiles")
     .select("whatsapp")
     .eq("id", userId)
     .maybeSingle();
 
-  if (error) {
-    throw new Error(`Erro ao buscar WhatsApp do usuário: ${error.message}`);
+  if (primary.error && !isMissingColumnError(primary.error, "id")) {
+    throw new Error(
+      `Erro ao buscar WhatsApp do usuário: ${primary.error.message}`
+    );
   }
 
-  return data?.whatsapp || null;
+  if (primary.data?.whatsapp) return primary.data.whatsapp;
+
+  const fallback = await supabase
+    .from("profiles")
+    .select("whatsapp")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (fallback.error) {
+    throw new Error(
+      `Erro ao buscar WhatsApp do usuário: ${fallback.error.message}`
+    );
+  }
+
+  return fallback.data?.whatsapp || null;
 }
 
 /**
