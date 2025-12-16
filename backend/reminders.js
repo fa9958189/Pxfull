@@ -691,14 +691,38 @@ async function loadRemindersForNow(todayStr) {
 }
 
 async function getUserPhone(userId) {
-  const { data, error } = await supabase
-    .from("profiles")
-    .select("whatsapp")
-    .eq("id", userId)
-    .single();
+  // 1) Primeiro: tabela correta para ID do Auth
+  {
+    const { data, error } = await supabase
+      .from("profiles_auth")
+      .select("whatsapp")
+      .eq("auth_id", userId)
+      .maybeSingle();
 
-  if (error) throw error;
-  return data?.whatsapp || null;
+    if (error) {
+      console.error("Erro buscando telefone (profiles_auth):", error);
+    } else if (data?.whatsapp) {
+      return normalizePhone(data.whatsapp);
+    }
+  }
+
+  // 2) Fallback: caso você também guarde em profiles (id = userId)
+  {
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("whatsapp")
+      .eq("id", userId)
+      .maybeSingle();
+
+    if (error) {
+      console.error("Erro buscando telefone (profiles):", error);
+    } else if (data?.whatsapp) {
+      return normalizePhone(data.whatsapp);
+    }
+  }
+
+  // Se não achou, retorna null (sem quebrar o worker)
+  return null;
 }
 
 export async function checkWorkoutRemindersOnce() {
@@ -734,16 +758,10 @@ export async function checkWorkoutRemindersOnce() {
     sentInMinute.add(key);
     setTimeout(() => sentInMinute.delete(key), MINUTE_CACHE_TTL_MS);
 
-    let phone;
-    try {
-      phone = await getUserPhone(reminder.user_id);
-    } catch (err) {
-      console.error("❌ Erro buscando telefone do usuário:", err);
-      continue;
-    }
+    const phone = await getUserPhone(reminder.user_id);
 
     if (!phone) {
-      console.warn("⚠️ Usuário sem telefone cadastrado. user_id=", reminder.user_id);
+      console.warn("Sem telefone para o usuário:", reminder.user_id);
       continue;
     }
 
