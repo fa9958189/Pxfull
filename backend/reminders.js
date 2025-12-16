@@ -292,14 +292,6 @@ export async function fetchUpcomingEvents() {
   return data || [];
 }
 
-function isMissingColumnError(error, columnName) {
-  const message = error?.message || "";
-  return (
-    error?.code === "42703" ||
-    new RegExp(`column .*${columnName}.* does not exist`, "i").test(message)
-  );
-}
-
 /**
  * Busca o WhatsApp do usuário na tabela profiles.
  * Aqui usamos o userId que vem do campo user_id da tabela events.
@@ -307,33 +299,39 @@ function isMissingColumnError(error, columnName) {
  * @returns {Promise<string|null>}
  */
 export async function fetchUserWhatsapp(userId) {
-  const primary = await supabase
-    .from("profiles")
-    .select("whatsapp")
-    .eq("id", userId)
-    .maybeSingle();
+  // userId aqui é o auth_id que tá vindo do events.user_id
+  const tries = [
+    { table: "profiles_auth", column: "auth_id" },
+    { table: "profiles", column: "id" },
+  ];
 
-  if (primary.error && !isMissingColumnError(primary.error, "id")) {
-    throw new Error(
-      `Erro ao buscar WhatsApp do usuário: ${primary.error.message}`
-    );
+  for (const t of tries) {
+    const { data, error } = await supabase
+      .from(t.table)
+      .select("whatsapp")
+      .eq(t.column, userId)
+      .maybeSingle();
+
+    // Se não achou linha, isso NÃO é erro fatal -> só tenta a próxima tabela
+    if (
+      error &&
+      (error.code === "PGRST116" || String(error.details || "").includes("0 rows"))
+    ) {
+      continue;
+    }
+
+    // Erro real
+    if (error) {
+      console.error(`❌ Erro buscando whatsapp em ${t.table}.${t.column}:`, error);
+      return null;
+    }
+
+    if (data?.whatsapp) {
+      return normalizePhone(data.whatsapp); // mantém tua regra de normalização
+    }
   }
 
-  if (primary.data?.whatsapp) return primary.data.whatsapp;
-
-  const fallback = await supabase
-    .from("profiles")
-    .select("whatsapp")
-    .eq("user_id", userId)
-    .maybeSingle();
-
-  if (fallback.error) {
-    throw new Error(
-      `Erro ao buscar WhatsApp do usuário: ${fallback.error.message}`
-    );
-  }
-
-  return fallback.data?.whatsapp || null;
+  return null;
 }
 
 /**
