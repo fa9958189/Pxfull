@@ -399,6 +399,46 @@ canvas{ background:transparent; }
   }
 }
 
+/* ===== Responsivo: Cadastro de Usuários (mobile) ===== */
+
+/* A tabela precisa rolar DENTRO do container no mobile */
+.users-table-container{
+  overflow-x: auto;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Garante que o card single não fique “apertado” ou empurrado */
+.container.single-card{
+  width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* Ajustes gerais mobile */
+@media (max-width: 768px){
+  .container.single-card{
+    padding: 0 12px;
+  }
+
+  .admin-card{
+    width: 100%;
+  }
+}
+
+/* Mobile menor ainda (celular pequeno) */
+@media (max-width: 520px){
+  /* mantém tabela rolável sem quebrar o layout */
+  .admin-card table{
+    min-width: 520px; /* antes estava grande demais em alguns lugares */
+  }
+
+  /* evita qualquer “vazamento” horizontal do card */
+  .admin-card{
+    overflow: hidden;
+  }
+}
+
 /* Componentes React adicionais */
 .badge-income{ background:rgba(74,222,128,.15); color:#7bf2a4; }
 .badge-expense{ background:rgba(239,68,68,.15); color:#ff9ea3; }
