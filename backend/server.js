@@ -8,6 +8,7 @@ import { supabase } from "./supabase.js";
 import {
   sendWhatsAppMessage,
   startEventReminderWorker,
+  startDailyWorkoutScheduleWorker,
   startWorkoutReminderWorker,
 } from "./reminders.js";
 import { analyzeFoodImage } from "./ai/foodScanner.js";
@@ -31,6 +32,7 @@ app.use(express.json());
 
 // Inicia o job de lembretes (agenda)
 startEventReminderWorker();
+startDailyWorkoutScheduleWorker();
 
 app.get("/debug/zapi-test", async (req, res) => {
   try {
