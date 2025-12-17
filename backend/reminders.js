@@ -1,6 +1,39 @@
 import "dotenv/config";
 import { createClient } from "@supabase/supabase-js";
 
+const MOTIVATIONAL_MESSAGES = [
+  "Disciplina vence a motivação.",
+  "Quem começa cedo chega mais longe.",
+  "Sem desculpas, só ação.",
+  "Constância hoje, resultado amanhã.",
+  "Um dia de cada vez, sem parar.",
+  "O corpo alcança o que a mente decide.",
+  "Foco no processo, o resultado vem.",
+  "Treino feito é treino que conta.",
+  "Acordar cedo é uma escolha de quem quer evoluir.",
+  "Pequenos esforços diários constroem grandes resultados.",
+  "Não é sobre vontade, é sobre compromisso.",
+  "O difícil de hoje vira força amanhã.",
+  "Você não precisa de motivação, precisa de constância.",
+  "Faça hoje o que o seu futuro vai agradecer.",
+  "Todo treino te deixa mais forte que ontem.",
+  "Levanta, respira e vai. Simples assim.",
+  "Nada muda se você não se mover.",
+  "O hábito certo vence qualquer desculpa.",
+  "A disciplina constrói o que a motivação promete.",
+  "Treinar cedo é investir no seu dia inteiro.",
+];
+
+function getRandomMotivationalMessage() {
+  if (!MOTIVATIONAL_MESSAGES.length) {
+    return "";
+  }
+
+  return MOTIVATIONAL_MESSAGES[
+    Math.floor(Math.random() * MOTIVATIONAL_MESSAGES.length)
+  ];
+}
+
 const SUPABASE_URL =
   process.env.SUPABASE_URL || "https://gklpjwjzluqsnavwhwxf.supabase.co";
 const SUPABASE_SERVICE_ROLE_KEY =
@@ -843,7 +876,8 @@ export async function checkDailyWorkoutScheduleRemindersOnce() {
           continue;
         }
 
-        const message = `Vamos lá, pronto para mais um dia? Hoje seu treino é o ${workoutName}.`;
+        const motivationalMessage = getRandomMotivationalMessage();
+        const message = `🌅 Bom dia! ${motivationalMessage}\nHoje seu treino é o ${workoutName}. 💪`;
         const sendResult = await sendWhatsAppMessage({ phone, message });
 
         if (!sendResult?.ok) {
