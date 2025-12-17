@@ -47,6 +47,11 @@ function formatDateOnlyInSaoPaulo(date) {
   return formatter.format(date);
 }
 
+function getWeekdaySP(now) {
+  const day = now.getDay();
+  return day === 0 ? 7 : day;
+}
+
 function normalizePhone(phone) {
   const digits = String(phone || "").replace(/\D/g, "");
   if (!digits) return null;
@@ -735,6 +740,150 @@ function formatHHMM(now) {
   const hours = String(now.getHours()).padStart(2, "0");
   const minutes = String(now.getMinutes()).padStart(2, "0");
   return `${hours}:${minutes}`;
+}
+
+async function hasDailyWorkoutReminderBeenSent(userId, dateStr) {
+  const { data, error } = await supabase
+    .from("workout_schedule_reminder_logs")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("entry_date", dateStr)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(
+      `Erro ao verificar log de lembrete diário: ${error.message}`
+    );
+  }
+
+  return Boolean(data);
+}
+
+async function markDailyWorkoutReminderSent(userId, dateStr, message) {
+  const payload = {
+    user_id: userId,
+    entry_date: dateStr,
+    message,
+  };
+
+  const { error } = await supabase
+    .from("workout_schedule_reminder_logs")
+    .upsert(payload, { onConflict: "user_id,entry_date" });
+
+  if (error) {
+    throw new Error(
+      `Erro ao registrar lembrete diário: ${error.message}`
+    );
+  }
+}
+
+export async function checkDailyWorkoutScheduleRemindersOnce() {
+  try {
+    const now = getNowInSaoPaulo();
+    const hours = now.getHours();
+    const minutes = now.getMinutes();
+
+    if (hours !== 5 || minutes > 1) {
+      return;
+    }
+
+    const weekday = getWeekdaySP(now);
+    const todayStr = formatDateOnlyInSaoPaulo(now);
+
+    const { data: schedules, error } = await supabase
+      .from("workout_schedule")
+      .select("id, user_id, workout_id")
+      .eq("weekday", weekday)
+      .eq("is_active", true)
+      .not("workout_id", "is", null);
+
+    if (error) {
+      throw new Error(`Erro ao buscar agenda de treino: ${error.message}`);
+    }
+
+    for (const schedule of schedules || []) {
+      try {
+        const alreadySent = await hasDailyWorkoutReminderBeenSent(
+          schedule.user_id,
+          todayStr
+        );
+
+        if (alreadySent) {
+          continue;
+        }
+
+        const whatsapp = await fetchUserWhatsapp(schedule.user_id);
+        const phone = normalizePhone(whatsapp);
+
+        if (!phone) {
+          console.warn(
+            "⚠️ WhatsApp não encontrado ou inválido para usuário:",
+            schedule.user_id
+          );
+          continue;
+        }
+
+        const { data: routine, error: routineError } = await supabase
+          .from("workout_routines")
+          .select("name")
+          .eq("id", schedule.workout_id)
+          .maybeSingle();
+
+        if (routineError) {
+          console.error("❌ Erro ao buscar treino:", routineError.message);
+          continue;
+        }
+
+        const workoutName = routine?.name;
+        if (!workoutName) {
+          console.warn(
+            "⚠️ Treino não encontrado para o lembrete diário:",
+            schedule.workout_id
+          );
+          continue;
+        }
+
+        const message = `Vamos lá, pronto para mais um dia? Hoje seu treino é o ${workoutName}.`;
+        const sendResult = await sendWhatsAppMessage({ phone, message });
+
+        if (!sendResult?.ok) {
+          console.error(
+            "❌ Falha ao enviar lembrete diário:",
+            sendResult?.status
+          );
+          continue;
+        }
+
+        await markDailyWorkoutReminderSent(schedule.user_id, todayStr, message);
+      } catch (err) {
+        console.error("❌ Erro ao processar lembrete diário:", err);
+      }
+    }
+  } catch (err) {
+    console.error("❌ Erro no worker diário de treinos:", err);
+  }
+}
+
+let dailyWorkoutScheduleIntervalId = null;
+
+export function startDailyWorkoutScheduleWorker() {
+  if (dailyWorkoutScheduleIntervalId) {
+    return dailyWorkoutScheduleIntervalId;
+  }
+
+  console.log("🟢 Worker de treino diário iniciado");
+
+  checkDailyWorkoutScheduleRemindersOnce().catch((err) =>
+    console.error("❌ Erro inicial no worker diário:", err)
+  );
+
+  dailyWorkoutScheduleIntervalId = setInterval(() => {
+    checkDailyWorkoutScheduleRemindersOnce().catch((err) =>
+      console.error("❌ Erro no ciclo do worker diário:", err)
+    );
+  }, 30_000);
+
+  return dailyWorkoutScheduleIntervalId;
 }
 
 function formatTempo(value) {
