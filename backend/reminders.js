@@ -93,6 +93,7 @@ async function logEventReminder({
   providerMessageId = null,
   status,
   error: errorMessage = null,
+  type = null,
 }) {
   const payload = {
     event_id: eventId,
@@ -103,6 +104,10 @@ async function logEventReminder({
     status,
     error: errorMessage,
   };
+
+  if (type) {
+    payload.type = type;
+  }
 
   const { error } = await supabase.from("event_reminder_logs").insert(payload);
 
@@ -122,6 +127,77 @@ async function fetchTodaysEvents(todayStr) {
   }
 
   return data || [];
+}
+
+async function fetchEventsByDate(dateStr) {
+  const { data, error } = await supabase
+    .from("events")
+    .select("id, user_id, title, date, start, notes")
+    .eq("date", dateStr);
+
+  if (error) {
+    throw new Error(
+      `Erro ao buscar eventos da data ${dateStr}: ${error.message}`
+    );
+  }
+
+  return data || [];
+}
+
+const TWO_DAYS_BEFORE_REMINDER_TYPE = "two_days_before";
+const TWO_DAYS_BEFORE_HOUR = 8;
+const TWO_DAYS_BEFORE_MINUTE = 0;
+
+async function hasReminderTypeBeenSent(eventId, type) {
+  const { data, error } = await supabase
+    .from("event_reminder_logs")
+    .select("id")
+    .eq("event_id", eventId)
+    .eq("status", "success")
+    .eq("type", type)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(
+      `Erro ao verificar envio do lembrete (${type}): ${error.message}`
+    );
+  }
+
+  return Boolean(data);
+}
+
+function buildTwoDaysBeforeMessage(event) {
+  const lines = [
+    "⏰ Lembrete antecipado",
+    "Seu compromisso está marcado para daqui a 2 dias.",
+    "",
+    `📌 Título: ${event.title || "Evento"}`,
+    `📅 Data: ${event.date || "-"}`,
+    `🕒 Horário: ${event.start || "-"}`,
+  ];
+
+  if (event.notes) {
+    lines.push("", `📝 Notas: ${event.notes}`);
+  }
+
+  return lines.join("\n");
+}
+
+function getTwoDaysBeforeReminderTime(event) {
+  const eventDate = toSaoPauloDate(event.date, event.start || "00:00");
+  if (!eventDate) return null;
+
+  const twoDaysBefore = new Date(
+    eventDate.getTime() - 2 * 24 * 60 * 60 * 1000
+  );
+  const twoDaysBeforeStr = formatDateOnlyInSaoPaulo(twoDaysBefore);
+
+  return toSaoPauloDate(
+    twoDaysBeforeStr,
+    `${String(TWO_DAYS_BEFORE_HOUR).padStart(2, "0")}:${String(
+      TWO_DAYS_BEFORE_MINUTE
+    ).padStart(2, "0")}`
+  );
 }
 
 function buildEventReminderMessage(event) {
@@ -145,6 +221,75 @@ export async function checkEventReminders() {
     const todayStr = formatDateOnlyInSaoPaulo(now);
 
     console.log(`🕒 Verificando eventos do dia ${todayStr}`);
+
+    const twoDaysAhead = new Date(now.getTime() + 2 * 24 * 60 * 60 * 1000);
+    const twoDaysAheadStr = formatDateOnlyInSaoPaulo(twoDaysAhead);
+
+    const eventsTwoDaysAhead = await fetchEventsByDate(twoDaysAheadStr);
+
+    for (const event of eventsTwoDaysAhead) {
+      if (!event.user_id) continue;
+
+      const reminderTime = getTwoDaysBeforeReminderTime(event);
+      if (!reminderTime) continue;
+
+      if (!isWithinWindow(now, reminderTime, REMINDER_INTERVAL_MINUTES)) {
+        continue;
+      }
+
+      const alreadySentTwoDays = await hasReminderTypeBeenSent(
+        event.id,
+        TWO_DAYS_BEFORE_REMINDER_TYPE
+      );
+
+      if (alreadySentTwoDays) {
+        continue;
+      }
+
+      const whatsapp = await fetchUserWhatsapp(event.user_id);
+      const phone = normalizePhone(whatsapp);
+
+      if (!phone) {
+        const errorMessage = "Telefone inválido para o usuário";
+        await logEventReminder({
+          eventId: event.id,
+          userId: event.user_id,
+          status: "error",
+          error: errorMessage,
+          type: TWO_DAYS_BEFORE_REMINDER_TYPE,
+        });
+        console.error("⚠️ Usuário sem telefone válido, ignorando evento D-2");
+        continue;
+      }
+
+      const message = buildTwoDaysBeforeMessage(event);
+
+      const maskedPhone = phone.replace(/.(?=.{4})/g, "*");
+      console.log(`📤 Enviando WhatsApp (D-2) para ${maskedPhone}`);
+      const sendResult = await sendWhatsappMessage({ to: phone, message });
+
+      if (!sendResult?.ok) {
+        const errorMessage = `Envio D-2 via Z-API retornou status ${sendResult?.status}`;
+        await logEventReminder({
+          eventId: event.id,
+          userId: event.user_id,
+          status: "error",
+          error: errorMessage,
+          type: TWO_DAYS_BEFORE_REMINDER_TYPE,
+        });
+        console.error("❌ Falha ao enviar lembrete D-2:", errorMessage);
+        continue;
+      }
+
+      await logEventReminder({
+        eventId: event.id,
+        userId: event.user_id,
+        status: "success",
+        type: TWO_DAYS_BEFORE_REMINDER_TYPE,
+      });
+
+      console.log("✅ Lembrete D-2 enviado e registrado");
+    }
 
     const events = await fetchTodaysEvents(todayStr);
 
