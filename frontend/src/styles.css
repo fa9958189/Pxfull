@@ -359,10 +359,18 @@ canvas{ background:transparent; }
   }
 
   /* === Tabelas responsivas no mobile (Transações / Agenda / Usuários) === */
-  .dashboard-card table,
-  .admin-card table,
-  aside.card table{
+  .transactions-scroll,
+  .events-table-container,
+  .usuarios-scroll{
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .transactions-scroll table,
+  .events-table-container table,
+  .usuarios-scroll table{
     min-width: 650px;
+    width: 100%;
   }
 }
 
