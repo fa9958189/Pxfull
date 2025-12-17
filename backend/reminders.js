@@ -607,7 +607,7 @@ function isSchemaCacheError(error) {
 async function loadRemindersFromSupabase(todayStr) {
   const { data, error } = await supabase
     .from(WORKOUT_SCHEDULE_TABLE)
-    .select("id, user_id, start, title")
+    .select("id, user_id, start, title, notes")
     .eq("date", todayStr);
 
   if (error) throw error;
@@ -617,7 +617,7 @@ async function loadRemindersFromSupabase(todayStr) {
 async function loadRemindersViaRest(todayStr) {
   const baseUrl = SUPABASE_URL?.replace(/\/$/, "");
   const url = `${baseUrl}/rest/v1/${WORKOUT_SCHEDULE_TABLE}` +
-    `?select=id,user_id,start,title` +
+    `?select=id,user_id,start,title,notes` +
     `&date=eq.${todayStr}`;
 
   const headers = {
@@ -734,9 +734,13 @@ export async function checkWorkoutRemindersOnce() {
       continue;
     }
 
-    const message = reminder.title
+    let message = reminder.title
       ? `📌 Lembrete: "${reminder.title}" está marcado para agora (${hhmm}).`
       : `📌 Lembrete: seu treino está marcado para agora (${hhmm}). Bora! 💪`;
+
+    if (reminder.notes && String(reminder.notes).trim()) {
+      message += `\n📝 Notas: ${String(reminder.notes).trim()}`;
+    }
 
     try {
       const z = await sendWhatsAppMessage({ phone, message });
