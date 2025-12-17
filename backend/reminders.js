@@ -19,12 +19,13 @@ const WHATSAPP_API_TOKEN = process.env.WHATSAPP_API_TOKEN;
 
 // Z-API
 const ZAPI_INSTANCE_ID = process.env.ZAPI_INSTANCE_ID;
-const ZAPI_TOKEN = process.env.ZAPI_TOKEN;
-const ZAPI_CLIENT_TOKEN = process.env.ZAPI_CLIENT_TOKEN;
+const ZAPI_INSTANCE_TOKEN = process.env.ZAPI_INSTANCE_TOKEN;
+const ZAPI_CLIENT_TOKEN = process.env.ZAPI_CLIENT_TOKEN || WHATSAPP_API_TOKEN;
 const WHATSAPP_API_URL =
-  ZAPI_INSTANCE_ID && ZAPI_TOKEN
-    ? `https://api.z-api.io/instances/${ZAPI_INSTANCE_ID}/token/${ZAPI_TOKEN}/send-text`
-    : null;
+  process.env.WHATSAPP_API_URL ||
+  (ZAPI_INSTANCE_ID && ZAPI_INSTANCE_TOKEN
+    ? `https://api.z-api.io/instances/${ZAPI_INSTANCE_ID}/token/${ZAPI_INSTANCE_TOKEN}/send-text`
+    : null);
 
 const TZ = "America/Sao_Paulo";
 
@@ -540,7 +541,7 @@ export async function sendWhatsAppMessage({ phone, message }) {
 
   const url = WHATSAPP_API_URL;
   if (!url) {
-    throw new Error("URL da API de WhatsApp não configurada");
+    throw new Error("URL não configurada");
   }
 
   const body = {
@@ -551,10 +552,6 @@ export async function sendWhatsAppMessage({ phone, message }) {
   const headers = {
     "Content-Type": "application/json",
   };
-
-  if (WHATSAPP_API_TOKEN) {
-    headers.Authorization = `Bearer ${WHATSAPP_API_TOKEN}`;
-  }
 
   if (ZAPI_CLIENT_TOKEN) headers["Client-Token"] = ZAPI_CLIENT_TOKEN;
 
