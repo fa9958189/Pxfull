@@ -145,6 +145,10 @@ h2.title, h3.title{ margin:0 0 10px; font-weight:600; }
   justify-items:center;
 }
 
+.container.single-card > .admin-card{
+  grid-area: main;
+}
+
 .container.single-card > *{
   width:100%;
 }
