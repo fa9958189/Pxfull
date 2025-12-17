@@ -15,14 +15,16 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
   auth: { persistSession: false },
 });
 
-const WHATSAPP_API_URL = process.env.WHATSAPP_API_URL;
 const WHATSAPP_API_TOKEN = process.env.WHATSAPP_API_TOKEN;
 
 // Z-API
 const ZAPI_INSTANCE_ID = process.env.ZAPI_INSTANCE_ID;
 const ZAPI_TOKEN = process.env.ZAPI_TOKEN;
 const ZAPI_CLIENT_TOKEN = process.env.ZAPI_CLIENT_TOKEN;
-const ZAPI_BASE_URL = process.env.ZAPI_BASE_URL || "https://api.z-api.io";
+const WHATSAPP_API_URL =
+  ZAPI_INSTANCE_ID && ZAPI_TOKEN
+    ? `https://api.z-api.io/instances/${ZAPI_INSTANCE_ID}/token/${ZAPI_TOKEN}/send-text`
+    : null;
 
 const TZ = "America/Sao_Paulo";
 
@@ -44,19 +46,10 @@ function formatDateOnlyInSaoPaulo(date) {
   return formatter.format(date);
 }
 
-function normalizePhone(raw) {
-  const digits = String(raw || "").replace(/\D/g, "").trim();
-  if (!digits) return "";
-
-  if (digits.length === 10 || digits.length === 11) {
-    return `55${digits}`;
-  }
-
-  if (digits.startsWith("55") && digits.length >= 12 && digits.length <= 13) {
-    return digits;
-  }
-
-  return "";
+function normalizePhone(phone) {
+  const digits = String(phone || "").replace(/\D/g, "");
+  if (!digits) return null;
+  return digits.startsWith("55") ? digits : `55${digits}`;
 }
 
 function toSaoPauloDate(dateStr, timeStr) {
@@ -299,39 +292,23 @@ export async function fetchUpcomingEvents() {
  * @returns {Promise<string|null>}
  */
 export async function fetchUserWhatsapp(userId) {
-  // userId aqui é o auth_id que tá vindo do events.user_id
-  const tries = [
-    { table: "profiles_auth", column: "auth_id" },
-    { table: "profiles", column: "id" },
-  ];
+  const { data, error } = await supabase
+    .from("profiles_auth")
+    .select("whatsapp")
+    .eq("auth_id", userId)
+    .maybeSingle();
 
-  for (const t of tries) {
-    const { data, error } = await supabase
-      .from(t.table)
-      .select("whatsapp")
-      .eq(t.column, userId)
-      .maybeSingle();
-
-    // Se não achou linha, isso NÃO é erro fatal -> só tenta a próxima tabela
-    if (
-      error &&
-      (error.code === "PGRST116" || String(error.details || "").includes("0 rows"))
-    ) {
-      continue;
-    }
-
-    // Erro real
-    if (error) {
-      console.error(`❌ Erro buscando whatsapp em ${t.table}.${t.column}:`, error);
-      return null;
-    }
-
-    if (data?.whatsapp) {
-      return normalizePhone(data.whatsapp); // mantém tua regra de normalização
-    }
+  if (error) {
+    console.error("❌ Erro buscando whatsapp em profiles_auth:", error);
+    return null;
   }
 
-  return null;
+  if (!data?.whatsapp) {
+    console.warn("⚠️ WhatsApp não encontrado para usuário:", userId);
+    return null;
+  }
+
+  return data.whatsapp || null;
 }
 
 /**
@@ -558,21 +535,16 @@ export async function startRemindersJob({
 const MINUTE_CACHE_TTL_MS = 70_000;
 
 export async function sendWhatsAppMessage({ phone, message }) {
-  const sanitizedPhone = String(phone || "").replace(/\D/g, "");
-  if (!sanitizedPhone) throw new Error("Telefone vazio");
+  const normalizedPhone = normalizePhone(phone);
+  if (!normalizedPhone) throw new Error("Telefone vazio ou inválido");
 
-  const url =
-    WHATSAPP_API_URL ||
-    (ZAPI_INSTANCE_ID && ZAPI_TOKEN
-      ? `${ZAPI_BASE_URL}/instances/${ZAPI_INSTANCE_ID}/token/${ZAPI_TOKEN}/send-text`
-      : null);
-
+  const url = WHATSAPP_API_URL;
   if (!url) {
     throw new Error("URL da API de WhatsApp não configurada");
   }
 
   const body = {
-    phone: sanitizedPhone,
+    phone: normalizedPhone,
     message,
   };
 
@@ -586,7 +558,7 @@ export async function sendWhatsAppMessage({ phone, message }) {
 
   if (ZAPI_CLIENT_TOKEN) headers["Client-Token"] = ZAPI_CLIENT_TOKEN;
 
-  const maskedPhone = sanitizedPhone.replace(/.(?=.{4})/g, "*");
+  const maskedPhone = normalizedPhone.replace(/.(?=.{4})/g, "*");
   console.log("📨 Enviando WhatsApp (Z-API) para", maskedPhone);
 
   try {
