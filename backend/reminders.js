@@ -789,12 +789,16 @@ async function fetchDailyRemindersByTime(hhmm) {
   return data || [];
 }
 
-async function hasDailyReminderBeenSent(reminderId, dateStr) {
+async function hasDailyReminderBeenSent(reminder, dateStr) {
+  const { user_id: userId } = reminder;
+
   const { data, error } = await supabase
     .from("daily_reminder_logs")
     .select("reminder_id")
-    .eq("reminder_id", reminderId)
+    .eq("user_id", userId)
+    .eq("reminder_id", reminder.id)
     .eq("entry_date", dateStr)
+    .eq("status", "success")
     .maybeSingle();
 
   if (error) {
@@ -804,15 +808,23 @@ async function hasDailyReminderBeenSent(reminderId, dateStr) {
   return Boolean(data);
 }
 
-async function logDailyReminderSent(reminderId, dateStr) {
+async function logDailyReminderSent(reminder, dateStr, status, message) {
+  if (!reminder?.user_id) {
+    console.error("Daily reminder missing user_id", reminder);
+    return;
+  }
+
   const payload = {
-    reminder_id: reminderId,
+    user_id: reminder.user_id,
+    reminder_id: reminder.id,
     entry_date: dateStr,
+    status,
+    message,
   };
 
   const { error } = await supabase
     .from("daily_reminder_logs")
-    .upsert(payload, { onConflict: "reminder_id,entry_date" });
+    .upsert(payload, { onConflict: "user_id,reminder_id,entry_date" });
 
   if (error) {
     throw new Error(`Erro ao registrar agenda diária: ${error.message}`);
@@ -835,7 +847,12 @@ export async function checkDailyRemindersOnce() {
 
   for (const reminder of reminders) {
     try {
-      const alreadySent = await hasDailyReminderBeenSent(reminder.id, todayStr);
+      if (!reminder.user_id) {
+        console.error("Daily reminder missing user_id", reminder);
+        continue;
+      }
+
+      const alreadySent = await hasDailyReminderBeenSent(reminder, todayStr);
       if (alreadySent) {
         continue;
       }
@@ -856,10 +873,11 @@ export async function checkDailyRemindersOnce() {
 
       if (!sendResult?.ok) {
         console.error("❌ Falha ao enviar agenda diária:", sendResult);
+        await logDailyReminderSent(reminder, todayStr, "failed", message);
         continue;
       }
 
-      await logDailyReminderSent(reminder.id, todayStr);
+      await logDailyReminderSent(reminder, todayStr, "success", message);
     } catch (err) {
       console.error("❌ Erro ao processar lembrete diário:", err);
     }
