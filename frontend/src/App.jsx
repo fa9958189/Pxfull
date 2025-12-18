@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import WorkoutRoutine from './components/WorkoutRoutine.jsx';
 import FoodDiary from './components/FoodDiary.jsx';
+import DailyAgenda from './components/DailyAgenda.jsx';
 import './styles.css';
 
 const currencyFormatter = new Intl.NumberFormat('pt-BR', {
@@ -1390,6 +1391,12 @@ function App() {
         >
           Diário alimentar
         </button>
+        <button
+          className={activeView === 'dailyAgenda' ? 'tab active' : 'tab'}
+          onClick={() => setActiveView('dailyAgenda')}
+        >
+          Agenda Diária
+        </button>
       </div>
 
       {activeView === 'transactions' && (
@@ -1580,6 +1587,10 @@ function App() {
             />
           </section>
         </div>
+      )}
+
+      {activeView === 'dailyAgenda' && (
+        <DailyAgenda apiBaseUrl={workoutApiBase} notify={pushToast} />
       )}
     </>
   );
