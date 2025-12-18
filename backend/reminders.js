@@ -808,15 +808,15 @@ async function hasDailyReminderBeenSent(reminder, dateStr) {
   return Boolean(data);
 }
 
-async function logDailyReminderSent(reminder, dateStr, status, message) {
-  if (!reminder?.user_id) {
-    console.error("Daily reminder missing user_id", reminder);
+async function logDailyReminderSent(reminderId, userId, dateStr, status, message) {
+  if (!userId) {
+    console.error("Daily reminder missing user_id", { reminderId, userId });
     return;
   }
 
   const payload = {
-    user_id: reminder.user_id,
-    reminder_id: reminder.id,
+    user_id: userId,
+    reminder_id: reminderId,
     entry_date: dateStr,
     status,
     message,
@@ -873,11 +873,23 @@ export async function checkDailyRemindersOnce() {
 
       if (!sendResult?.ok) {
         console.error("❌ Falha ao enviar agenda diária:", sendResult);
-        await logDailyReminderSent(reminder, todayStr, "failed", message);
+        await logDailyReminderSent(
+          reminder.id,
+          reminder.user_id,
+          todayStr,
+          "failed",
+          message
+        );
         continue;
       }
 
-      await logDailyReminderSent(reminder, todayStr, "success", message);
+      await logDailyReminderSent(
+        reminder.id,
+        reminder.user_id,
+        todayStr,
+        "success",
+        message
+      );
     } catch (err) {
       console.error("❌ Erro ao processar lembrete diário:", err);
     }
