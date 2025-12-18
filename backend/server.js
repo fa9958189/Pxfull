@@ -280,6 +280,17 @@ const normalizeSportsString = (sports) => {
   return "";
 };
 
+// Helpers da Agenda Diária
+const mapDailyReminderRow = (row = {}) => ({
+  id: row.id,
+  user_id: row.user_id,
+  title: row.title,
+  time: row.time,
+  notes: row.notes,
+  is_active: row.is_active,
+  active: row.is_active,
+});
+
 // CRUD Agenda Diária
 app.get("/api/daily-reminders", async (req, res) => {
   try {
@@ -289,19 +300,18 @@ app.get("/api/daily-reminders", async (req, res) => {
     }
 
     const { data, error } = await supabase
-      .from("daily_reminders")
-      .select(
-        "id, user_id, title, reminder_time, notes, is_active"
-      )
+      .from("lembretes_diarios")
+      .select("id, user_id, title, time, notes, is_active")
       .eq("user_id", userId)
-      .order("reminder_time", { ascending: true });
+      .order("time", { ascending: true });
 
     if (error) {
       console.error("Erro ao listar agenda diária:", error);
-      return res.status(400).json({ error: error.message });
+      return res.status(500).json({ error: error.message });
     }
 
-    return res.json(data || []);
+    const items = (data || []).map(mapDailyReminderRow);
+    return res.json({ items });
   } catch (err) {
     console.error("Erro inesperado em GET /api/daily-reminders:", err);
     return res.status(500).json({ error: "Erro interno no servidor" });
@@ -310,83 +320,41 @@ app.get("/api/daily-reminders", async (req, res) => {
 
 app.post("/api/daily-reminders", async (req, res) => {
   try {
-    const userId = getUserIdFromRequest(req);
-    const { title, reminder_time, notes, is_active } = req.body || {};
+    const { id, title, time, notes, is_active } = req.body || {};
+    const userId = req.body?.user_id || req.body?.userId || getUserIdFromRequest(req);
 
-    if (!userId || !title || !reminder_time) {
+    if (!userId || !title || !time) {
       return res
         .status(400)
-        .json({ error: "userId, title e reminder_time são obrigatórios" });
+        .json({ error: "userId, title e time são obrigatórios" });
     }
 
     const payload = {
       user_id: userId,
       title,
-      reminder_time,
+      time,
       notes: notes ?? null,
       is_active: typeof is_active === "boolean" ? is_active : true,
     };
 
-    const { data, error } = await supabase
-      .from("daily_reminders")
-      .insert(payload)
-      .select(
-        "id, user_id, title, reminder_time, notes, is_active"
-      )
-      .single();
-
-    if (error) {
-      console.error("Erro ao criar lembrete diário:", error);
-      return res.status(400).json({ error: error.message });
+    if (id) {
+      payload.id = id;
     }
 
-    return res.json(data);
+    const { data, error } = await supabase
+      .from("lembretes_diarios")
+      .upsert(payload, { onConflict: "id" })
+      .select("id, user_id, title, time, notes, is_active")
+      .maybeSingle();
+
+    if (error) {
+      console.error("Erro ao salvar lembrete diário:", error);
+      return res.status(500).json({ error: error.message });
+    }
+
+    return res.json(mapDailyReminderRow(data || payload));
   } catch (err) {
     console.error("Erro inesperado em POST /api/daily-reminders:", err);
-    return res.status(500).json({ error: "Erro interno no servidor" });
-  }
-});
-
-app.put("/api/daily-reminders/:id", async (req, res) => {
-  try {
-    const { id } = req.params;
-    const userId = getUserIdFromRequest(req);
-    const { title, reminder_time, notes, is_active } = req.body || {};
-
-    if (!id || !userId || !title || !reminder_time) {
-      return res.status(400).json({
-        error: "id, userId, title e reminder_time são obrigatórios",
-      });
-    }
-
-    const payload = {
-      title,
-      reminder_time,
-      notes: notes ?? null,
-    };
-
-    if (typeof is_active === "boolean") {
-      payload.is_active = is_active;
-    }
-
-    const { data, error } = await supabase
-      .from("daily_reminders")
-      .update(payload)
-      .eq("id", id)
-      .eq("user_id", userId)
-      .select(
-        "id, user_id, title, reminder_time, notes, is_active"
-      )
-      .single();
-
-    if (error) {
-      console.error("Erro ao atualizar lembrete diário:", error);
-      return res.status(400).json({ error: error.message });
-    }
-
-    return res.json(data);
-  } catch (err) {
-    console.error("Erro inesperado em PUT /api/daily-reminders/:id:", err);
     return res.status(500).json({ error: "Erro interno no servidor" });
   }
 });
@@ -394,21 +362,21 @@ app.put("/api/daily-reminders/:id", async (req, res) => {
 app.delete("/api/daily-reminders/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const userId = getUserIdFromRequest(req);
+    const userId = req.query?.userId || req.query?.user_id || getUserIdFromRequest(req);
 
     if (!id || !userId) {
       return res.status(400).json({ error: "id e userId são obrigatórios" });
     }
 
     const { error } = await supabase
-      .from("daily_reminders")
+      .from("lembretes_diarios")
       .delete()
       .eq("id", id)
       .eq("user_id", userId);
 
     if (error) {
       console.error("Erro ao excluir lembrete diário:", error);
-      return res.status(400).json({ error: error.message });
+      return res.status(500).json({ error: error.message });
     }
 
     return res.json({ success: true });
@@ -421,24 +389,22 @@ app.delete("/api/daily-reminders/:id", async (req, res) => {
 app.patch("/api/daily-reminders/:id/toggle", async (req, res) => {
   try {
     const { id } = req.params;
-    const userId = getUserIdFromRequest(req);
+    const userId = req.query?.userId || req.query?.user_id || getUserIdFromRequest(req);
 
     if (!id || !userId) {
       return res.status(400).json({ error: "id e userId são obrigatórios" });
     }
 
     const { data: existing, error: fetchError } = await supabase
-      .from("daily_reminders")
-      .select(
-        "id, user_id, title, reminder_time, notes, is_active"
-      )
+      .from("lembretes_diarios")
+      .select("id, user_id, title, time, notes, is_active")
       .eq("id", id)
       .eq("user_id", userId)
       .maybeSingle();
 
     if (fetchError) {
       console.error("Erro ao carregar lembrete diário:", fetchError);
-      return res.status(400).json({ error: fetchError.message });
+      return res.status(500).json({ error: fetchError.message });
     }
 
     if (!existing) {
@@ -448,21 +414,19 @@ app.patch("/api/daily-reminders/:id/toggle", async (req, res) => {
     const nextStatus = !existing.is_active;
 
     const { data, error } = await supabase
-      .from("daily_reminders")
+      .from("lembretes_diarios")
       .update({ is_active: nextStatus })
       .eq("id", id)
       .eq("user_id", userId)
-      .select(
-        "id, user_id, title, reminder_time, notes, is_active"
-      )
+      .select("id, user_id, title, time, notes, is_active")
       .single();
 
     if (error) {
       console.error("Erro ao alternar lembrete diário:", error);
-      return res.status(400).json({ error: error.message });
+      return res.status(500).json({ error: error.message });
     }
 
-    return res.json(data);
+    return res.json(mapDailyReminderRow(data));
   } catch (err) {
     console.error(
       "Erro inesperado em PATCH /api/daily-reminders/:id/toggle:",

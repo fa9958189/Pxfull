@@ -9,7 +9,7 @@ const defaultForm = {
 
 const emptyReminders = [];
 
-function DailyAgenda({ apiBaseUrl, notify }) {
+function DailyAgenda({ apiBaseUrl, notify, userId }) {
   const [form, setForm] = useState(defaultForm);
   const [reminders, setReminders] = useState(emptyReminders);
   const [editingId, setEditingId] = useState(null);
@@ -19,16 +19,30 @@ function DailyAgenda({ apiBaseUrl, notify }) {
   const baseUrl = useMemo(() => apiBaseUrl?.replace(/\/$/, '') || '', [apiBaseUrl]);
 
   const fetchReminders = async () => {
+    if (!userId) {
+      setReminders(emptyReminders);
+      return;
+    }
+
     try {
       setLoading(true);
-      const response = await fetch(`${baseUrl}/api/daily-reminders`);
+      const response = await fetch(`${baseUrl}/api/daily-reminders?userId=${userId}`);
       if (!response.ok) {
-        throw new Error('Erro ao carregar lembretes.');
+        const errorBody = await response.json().catch(() => null);
+        const error = new Error('Erro ao carregar lembretes.');
+        error.details = errorBody;
+        throw error;
       }
       const data = await response.json();
-      setReminders(Array.isArray(data) ? data : []);
+      const items = Array.isArray(data) ? data : Array.isArray(data?.items) ? data.items : [];
+      const normalizedItems = items.map((item) => ({
+        ...item,
+        time: item.time || item.reminder_time || '',
+        active: item.active ?? item.is_active ?? true,
+      }));
+      setReminders(normalizedItems);
     } catch (err) {
-      console.warn('Erro ao buscar lembretes diários', err);
+      console.error('Erro ao buscar lembretes diários', err);
       notify?.('Não foi possível carregar os lembretes.', 'danger');
     } finally {
       setLoading(false);
@@ -38,9 +52,14 @@ function DailyAgenda({ apiBaseUrl, notify }) {
   useEffect(() => {
     fetchReminders();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [baseUrl]);
+  }, [baseUrl, userId]);
 
   const handleSubmit = async () => {
+    if (!userId) {
+      notify?.('Usuário não identificado. Faça login novamente.', 'danger');
+      return;
+    }
+
     if (!form.title || !form.time) {
       notify?.('Preencha título e horário.', 'warning');
       return;
@@ -49,18 +68,16 @@ function DailyAgenda({ apiBaseUrl, notify }) {
     try {
       setSaving(true);
       const payload = {
+        id: editingId,
+        user_id: userId,
         title: form.title,
         time: form.time,
         notes: form.notes,
-        active: !!form.active,
+        is_active: !!form.active,
       };
 
-      const url = editingId
-        ? `${baseUrl}/api/daily-reminders/${editingId}`
-        : `${baseUrl}/api/daily-reminders`;
-
-      const response = await fetch(url, {
-        method: editingId ? 'PUT' : 'POST',
+      const response = await fetch(`${baseUrl}/api/daily-reminders`, {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
@@ -92,8 +109,13 @@ function DailyAgenda({ apiBaseUrl, notify }) {
   };
 
   const handleDelete = async (reminder) => {
+    if (!userId) {
+      notify?.('Usuário não identificado. Faça login novamente.', 'danger');
+      return;
+    }
+
     try {
-      const response = await fetch(`${baseUrl}/api/daily-reminders/${reminder.id}`, {
+      const response = await fetch(`${baseUrl}/api/daily-reminders/${reminder.id}?userId=${userId}`, {
         method: 'DELETE',
       });
       if (!response.ok) {
@@ -108,8 +130,13 @@ function DailyAgenda({ apiBaseUrl, notify }) {
   };
 
   const handleToggle = async (reminder) => {
+    if (!userId) {
+      notify?.('Usuário não identificado. Faça login novamente.', 'danger');
+      return;
+    }
+
     try {
-      const response = await fetch(`${baseUrl}/api/daily-reminders/${reminder.id}/toggle`, {
+      const response = await fetch(`${baseUrl}/api/daily-reminders/${reminder.id}/toggle?userId=${userId}`, {
         method: 'PATCH',
       });
       if (!response.ok) {
