@@ -1493,7 +1493,7 @@ function App() {
 
           {activeTab === 'reports' && <Reports transactions={filteredTransactions} />}
           {activeTab === 'daily' && (
-            <DailyAgenda apiBaseUrl={workoutApiBase} notify={pushToast} />
+            <DailyAgenda apiBaseUrl={workoutApiBase} notify={pushToast} userId={session?.user?.id} />
           )}
         </section>
         {activeTab === 'form' && renderAgenda()}
