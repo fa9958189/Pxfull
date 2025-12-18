@@ -775,6 +775,119 @@ function formatHHMM(now) {
   return `${hours}:${minutes}`;
 }
 
+async function fetchDailyRemindersByTime(hhmm) {
+  const { data, error } = await supabase
+    .from("daily_reminders")
+    .select("id, user_id, title, reminder_time, notes, is_active")
+    .eq("reminder_time", hhmm)
+    .eq("is_active", true);
+
+  if (error) {
+    throw new Error(`Erro ao buscar agenda diária: ${error.message}`);
+  }
+
+  return data || [];
+}
+
+async function hasDailyReminderBeenSent(reminderId, dateStr) {
+  const { data, error } = await supabase
+    .from("daily_reminder_logs")
+    .select("reminder_id")
+    .eq("reminder_id", reminderId)
+    .eq("entry_date", dateStr)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`Erro ao verificar log da agenda diária: ${error.message}`);
+  }
+
+  return Boolean(data);
+}
+
+async function logDailyReminderSent(reminderId, dateStr) {
+  const payload = {
+    reminder_id: reminderId,
+    entry_date: dateStr,
+  };
+
+  const { error } = await supabase
+    .from("daily_reminder_logs")
+    .upsert(payload, { onConflict: "reminder_id,entry_date" });
+
+  if (error) {
+    throw new Error(`Erro ao registrar agenda diária: ${error.message}`);
+  }
+}
+
+export async function checkDailyRemindersOnce() {
+  const now = getNowInSaoPaulo();
+  const hhmm = formatHHMM(now);
+  const todayStr = formatDateOnlyInSaoPaulo(now);
+
+  let reminders = [];
+
+  try {
+    reminders = await fetchDailyRemindersByTime(hhmm);
+  } catch (err) {
+    console.error("❌ Erro ao carregar agenda diária:", err);
+    return;
+  }
+
+  for (const reminder of reminders) {
+    try {
+      const alreadySent = await hasDailyReminderBeenSent(reminder.id, todayStr);
+      if (alreadySent) {
+        continue;
+      }
+
+      const phone = await getUserPhone(reminder.user_id);
+      if (!phone) {
+        console.warn("⚠️ WhatsApp não encontrado para usuário:", reminder.user_id);
+        continue;
+      }
+
+      let message = `⏰ Agenda Diária\n${reminder.title || ""}`;
+      const notes = String(reminder.notes || "").trim();
+      if (notes) {
+        message += `\n\n📝 Notas: ${notes}`;
+      }
+
+      const sendResult = await sendWhatsAppMessage({ phone, message });
+
+      if (!sendResult?.ok) {
+        console.error("❌ Falha ao enviar agenda diária:", sendResult);
+        continue;
+      }
+
+      await logDailyReminderSent(reminder.id, todayStr);
+    } catch (err) {
+      console.error("❌ Erro ao processar lembrete diário:", err);
+    }
+  }
+}
+
+let dailyRemindersWorkerIntervalId = null;
+
+export function startDailyRemindersWorker() {
+  if (dailyRemindersWorkerIntervalId) {
+    return dailyRemindersWorkerIntervalId;
+  }
+
+  console.log("🟢 Worker de agenda diária iniciado");
+
+  checkDailyRemindersOnce().catch((err) =>
+    console.error("❌ Erro inicial no worker de agenda diária:", err)
+  );
+
+  dailyRemindersWorkerIntervalId = setInterval(() => {
+    checkDailyRemindersOnce().catch((err) =>
+      console.error("❌ Erro no ciclo da agenda diária:", err)
+    );
+  }, 30_000);
+
+  return dailyRemindersWorkerIntervalId;
+}
+
 async function hasDailyWorkoutReminderBeenSent(userId, dateStr) {
   const { data, error } = await supabase
     .from("workout_schedule_reminder_logs")
