@@ -1391,12 +1391,6 @@ function App() {
         >
           Diário alimentar
         </button>
-        <button
-          className={activeView === 'dailyAgenda' ? 'tab active' : 'tab'}
-          onClick={() => setActiveView('dailyAgenda')}
-        >
-          Agenda Diária
-        </button>
       </div>
 
       {activeView === 'transactions' && (
@@ -1593,10 +1587,6 @@ function App() {
             />
           </section>
         </div>
-      )}
-
-      {activeView === 'dailyAgenda' && (
-        <DailyAgenda apiBaseUrl={workoutApiBase} notify={pushToast} />
       )}
     </>
   );
