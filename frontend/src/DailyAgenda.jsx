@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 
 const defaultForm = {
   title: '',
-  time: '',
+  reminder_time: '',
   notes: '',
   active: true,
 };
@@ -28,7 +28,8 @@ function DailyAgenda({ apiBaseUrl, notify, userId }) {
       setLoading(true);
       const response = await fetch(`${baseUrl}/api/daily-reminders?userId=${userId}`);
       if (!response.ok) {
-        const errorBody = await response.json().catch(() => null);
+        const errorBody = await response.text();
+        console.error('load daily reminders failed', response.status, errorBody);
         const error = new Error('Erro ao carregar lembretes.');
         error.details = errorBody;
         throw error;
@@ -37,7 +38,7 @@ function DailyAgenda({ apiBaseUrl, notify, userId }) {
       const items = Array.isArray(data) ? data : Array.isArray(data?.items) ? data.items : [];
       const normalizedItems = items.map((item) => ({
         ...item,
-        time: item.time || item.reminder_time || '',
+        reminder_time: item.reminder_time || item.time || '',
         active: item.active ?? item.is_active ?? true,
       }));
       setReminders(normalizedItems);
@@ -60,7 +61,7 @@ function DailyAgenda({ apiBaseUrl, notify, userId }) {
       return;
     }
 
-    if (!form.title || !form.time) {
+    if (!form.title || !form.reminder_time) {
       notify?.('Preencha título e horário.', 'warning');
       return;
     }
@@ -68,21 +69,27 @@ function DailyAgenda({ apiBaseUrl, notify, userId }) {
     try {
       setSaving(true);
       const payload = {
-        id: editingId,
-        user_id: userId,
+        userId,
         title: form.title,
-        time: form.time,
+        reminder_time: form.reminder_time,
         notes: form.notes,
         is_active: !!form.active,
       };
 
-      const response = await fetch(`${baseUrl}/api/daily-reminders`, {
-        method: 'POST',
+      const url = editingId
+        ? `${baseUrl}/api/daily-reminders/${editingId}`
+        : `${baseUrl}/api/daily-reminders`;
+      const method = editingId ? 'PUT' : 'POST';
+
+      const response = await fetch(url, {
+        method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
 
       if (!response.ok) {
+        const errorBody = await response.text();
+        console.error('save daily reminder failed', response.status, errorBody);
         throw new Error('Erro ao salvar lembrete.');
       }
 
@@ -102,7 +109,7 @@ function DailyAgenda({ apiBaseUrl, notify, userId }) {
     setEditingId(reminder.id);
     setForm({
       title: reminder.title || '',
-      time: reminder.time || '',
+      reminder_time: reminder.reminder_time || reminder.time || '',
       notes: reminder.notes || '',
       active: reminder.active ?? true,
     });
@@ -119,6 +126,8 @@ function DailyAgenda({ apiBaseUrl, notify, userId }) {
         method: 'DELETE',
       });
       if (!response.ok) {
+        const errorBody = await response.text();
+        console.error('delete daily reminder failed', response.status, errorBody);
         throw new Error('Erro ao excluir lembrete.');
       }
       notify?.('Lembrete excluído.', 'success');
@@ -136,10 +145,14 @@ function DailyAgenda({ apiBaseUrl, notify, userId }) {
     }
 
     try {
-      const response = await fetch(`${baseUrl}/api/daily-reminders/${reminder.id}/toggle?userId=${userId}`, {
+      const response = await fetch(`${baseUrl}/api/daily-reminders/${reminder.id}/toggle`, {
         method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId }),
       });
       if (!response.ok) {
+        const errorBody = await response.text();
+        console.error('toggle daily reminder failed', response.status, errorBody);
         throw new Error('Erro ao atualizar status.');
       }
       notify?.('Status atualizado.', 'success');
@@ -181,8 +194,8 @@ function DailyAgenda({ apiBaseUrl, notify, userId }) {
             <label>Horário</label>
             <input
               type="time"
-              value={form.time}
-              onChange={(e) => setForm({ ...form, time: e.target.value })}
+              value={form.reminder_time}
+              onChange={(e) => setForm({ ...form, reminder_time: e.target.value })}
             />
           </div>
         </div>
@@ -239,7 +252,7 @@ function DailyAgenda({ apiBaseUrl, notify, userId }) {
               {reminders.map((reminder) => (
                 <tr key={reminder.id}>
                   <td>{reminder.title}</td>
-                  <td>{reminder.time || '-'}</td>
+                  <td>{reminder.reminder_time || '-'}</td>
                   <td>{reminder.notes || '-'}</td>
                   <td>
                     <span className={`badge ${reminder.active ? 'badge-active' : 'badge-inactive'}`}>
