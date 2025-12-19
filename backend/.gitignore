@@ -13,3 +13,5 @@ node_modules/
 # Ignorar logs
 *.log
 logs/
+
+/generated/prisma
