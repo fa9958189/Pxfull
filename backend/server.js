@@ -5,13 +5,7 @@ import fs from "fs/promises";
 import path from "path";
 import { fileURLToPath } from "url";
 import { supabase } from "./supabase.js";
-import {
-  sendWhatsAppMessage,
-  startEventReminderWorker,
-  startDailyRemindersWorker,
-  startDailyWorkoutScheduleWorker,
-  startWorkoutReminderWorker,
-} from "./reminders.js";
+import { sendWhatsAppMessage, startWorkoutReminderWorker } from "./reminders.js";
 import { analyzeFoodImage } from "./ai/foodScanner.js";
 import {
   createWorkoutSession,
@@ -30,11 +24,6 @@ import { createSimpleUpload } from "./utils/simpleUpload.js";
 const app = express();
 app.use(cors());
 app.use(express.json());
-
-// Inicia o job de lembretes (agenda)
-startEventReminderWorker();
-startDailyWorkoutScheduleWorker();
-startDailyRemindersWorker();
 
 app.get("/debug/zapi-test", async (req, res) => {
   try {
@@ -971,7 +960,9 @@ app.put("/api/food-diary/state", async (req, res) => {
   }
 });
 
-app.listen(3001, () => {
-  console.log("Backend rodando na porta 3001");
+const PORT = process.env.PORT || 3000;
+
+app.listen(PORT, () => {
+  console.log(`🚀 API rodando na porta ${PORT}`);
   startWorkoutReminderWorker();
 });
